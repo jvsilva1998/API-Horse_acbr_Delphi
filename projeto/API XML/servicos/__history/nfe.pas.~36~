@@ -1,0 +1,104 @@
+unit nfe;
+
+interface
+
+uses
+  XData.Service.Common,
+  parametros,
+  regras_nfe,
+  System.JSON,
+  funcoes,
+  XData.Server.Module,
+  System.SysUtils,
+  dialogs,
+  menu;
+
+type
+  [ServiceContract]
+  [Route('')]
+  Infe = interface(IInvokable)
+    ['{49034E5D-88BF-479C-BAFF-68C9A8E1E543}']
+    [httppost] [Route('xml/novo/')]function xml(dataInicio,dataFim:TDate;tipoNota:integer):TJSonObject;
+    [httpget]  [Route('xml/lista/')]function buscaXML([FromPath]pagina:Integer;[FromPath]registros:Integer):TJSonObject;
+    end;
+    [ServiceImplementation]
+      TInfe = class(TInterfacedObject, Infe)
+      private
+       function xml(dataInicio,dataFim:TDate;tipoNota:integer):TJSonObject;
+       function buscaXML(pagina:Integer;registros:Integer):TJSonObject;
+
+  end;
+
+
+implementation
+ var
+  usando:Boolean;
+
+
+
+
+
+{ TInfe }
+
+function TInfe.buscaXML(pagina, registros: Integer): TJSonObject;
+ var
+   usuario    : TJSONObject;
+   resultado  : TJSONObject;
+ begin
+     usuario           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuario.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado := regras_nfe.consultaXML(usuario.P['mensagemRetorno'].FindValue('mensagem').Value,pagina,registros);
+            if resultado.FindValue('codigoHttp').Value = '200' then
+               begin
+                result      := TJSonObject.ParseJSONValue(resultado.P['dadosRetorno'].ToString) as TJSonObject;
+               end else
+                   begin
+                    result  :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+                   end;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').Value));
+      end else
+           begin
+            result := TJSonObject.ParseJSONValue(usuario.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(usuario.FindValue('codigoHttp').Value));
+           end;
+
+ end;
+
+function TInfe.xml(dataInicio,dataFim:TDate;tipoNota:integer): TJSonObject;
+  var
+   resultado      : TJSONObject;
+   usuario        : TJSONObject;
+   tokenLogado    : string;
+ begin
+    tokenLogado :=  TXDataOperationContext.Current.Request.Headers.Get('Authorization');
+    menu.cliqueNfe := menu.cliqueNfe + 1;
+
+    if menu.cliqueNfe > 1 then
+       begin
+         if tokenLogado = TXDataOperationContext.Current.Request.Headers.Get('Authorization')  then
+         begin
+           menu.cliqueNfe := 0;
+           Sleep(1500);
+         end;
+       end;
+         usuario  := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+              if usuario.FindValue('codigoHttp').value = '200' then
+                begin
+                      resultado  :=  regras_nfe.emitirXML(dataInicio,dataFim,tipoNota,usuario.P['mensagemRetorno'].FindValue('mensagem').Value);
+                      result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+                      funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+                end else
+                     begin
+                       result := TJSonObject.ParseJSONValue(usuario.P['mensagemRetorno'].ToString) as TJSonObject;
+                       funcoes.statusHTTP(strtoint(usuario.FindValue('codigoHttp').Value));
+                     end;
+   tokenLogado := '';
+ end;
+
+initialization
+  RegisterServiceType(TypeInfo(Infe));
+  RegisterServiceType(TInfe);
+
+end.
+

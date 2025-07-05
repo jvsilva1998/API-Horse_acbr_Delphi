@@ -1,0 +1,314 @@
+unit parametros;
+
+interface
+uses
+system.classes;
+
+type
+
+
+
+
+  credito = class
+    codigoCobranca:string;
+    urlFatura:string;
+    descricao:string;
+    valor:Double;
+    quantidadeNota:Int64;
+    vencimentoCobranca:tdate;
+    status:string;
+  end;
+
+
+ venda  = class
+  codigoCobranca:string;
+  urlFatura:string;
+  descricaoPlano:string;
+  valor:Double;
+  vencimentoCobranca:tdate;
+  statusVenda:string;
+  diasVencimento:Int64;
+ end;
+
+
+  campanha = class
+   nomeCampanha:string;
+   urlImagem:string;
+   urlDestino:string;
+   corFundo1:string;
+   corFundo2:string;
+   dataInicio:tDate;
+   dataFim:tDate;
+  end;
+
+
+  {CLIENTES CADASTRO}
+  clientes = class
+   nomeRazao:string;
+   fantasiaApelido:string;
+   tipoCliente:int64; // 1 juridica 2 fisica//
+   tipoContribuinte:int64; // 1 CONTRUINTE 2 NÃO CONTRIBUI 3 ISENTO//
+   cpfCnpj:string;
+   ie:string;
+   im:string;
+   endereco:string;
+   numero:string;
+   complemento:string;
+   bairro:string;
+   cidade:string;
+   codigoCidade:string;
+   telefone:string;
+   celular:string;
+   email:string;
+   uf:string;
+   cep:string;
+   obs:string;
+   pais:string;
+   codigoPais:Int64;
+  end;
+
+
+
+  enderecoTransportadora = class
+   endereco:string;
+   numero:string;
+   bairro:string;
+   cidade:string;
+   uf:string;
+   cep:string;
+  end;
+
+  veiculoTranportadora = class
+    placa:string;
+    ufPlaca:string;
+    RNTC:String;
+  end;
+
+
+
+  {TRANSPORTADORAS CADASTRO}
+  transportadoras = class
+   nomeRazao:string;
+   tipoTranportadora:Int64; // 1 juridica 2 fisica//
+   cpfCnpj:string;
+   ie:string;
+   im:string;
+   telefone:string;
+   celular:string;
+   email:string;
+   obs:string;
+   enderecoTransportadora : enderecoTransportadora;
+  end;
+
+  {CADASTRO NATUREZAS}
+  naturezas = class
+   descricao:string;
+    codFinalidade, //1=normal//2=complementar//3=ajuste//4=devolução//5=complemento de valor ou ICMS//
+    tipoNfe, // 1- saida 2- entrada//
+    cfopEstadual,
+    cfopInterEstadual:int64;
+  end;
+
+
+  cofins = class
+   aliquota:Currency;
+   codigoCST:Int64;
+  end;
+
+  pis = class
+   aliquota:Currency;
+   codigoTributacao:Int64;
+  end;
+
+  ipi = class
+   aliquota:Currency;
+   codigoCST:Int64;
+  end;
+
+
+  icms = class
+   codigoCsosnCST:Int64;
+   codigoCST:Int64;
+   aliquota:Currency;
+   modalidadeBaseCalculo:Int64;
+  end;
+
+
+   ibpt = class
+     percentualFederal,
+     percentualEstadual,
+     percentualMunicipal:Currency;
+   end;
+
+   cfop = class
+    interno,
+    externo:Int64;
+   end;
+
+
+
+  {PERFIL DE IMPOSTO}
+  PerfilTibutario = class
+   descricao : string;
+   icms      : icms;
+   pis       : pis;
+   ipi       : ipi;
+   cofins    : cofins;
+end;
+
+
+
+
+    {DADOS ENDEREÇO DA EMPRESA}
+   endereco = class
+    endereco:string;
+    complemento:string;
+    numero:string;
+    cep:string;
+    bairro:string;
+    cidade:string;
+    codigoCidade:int64;
+    uf:string;
+   end;
+
+
+  {DADOS DA EMPRESA}
+  empresa = class
+    cnpj: string;
+    razao: string;
+    fantasia:string;
+    inscricaoEstadual:string;
+    inscricaoMunicipal:string;
+    cnae: string;
+    regime: Int64;    // 1 MEI - 2 SIMPLES NACIONAL // 3 -REGIME NORMAL//
+    segmento:Int64;  // 1 COMERCIO // 2 TRANSPORTE // 3 SERVIÇO // 4 INDUSTRIA // 5 OUTROS//
+    telefone:string;
+  end;
+
+
+
+   {DADOS ALTERAÇÕES EMPRESA}
+     alteraEmpresa = class
+      empresa : empresa;
+      enderecoEmpresa:endereco;
+     end;
+
+
+  {DADOS ENDEREÇO DA EMPRESA}
+   usuario = class
+    nome:string;
+    email:string;
+    senha:string;
+    celular:string;
+    codigoCobranca:string;
+    codigoIndicador:string;
+    pushToken:string;
+   end;
+
+
+  {USUARIOS}
+  usuarioCadastro = class
+    empresa         : empresa;
+    enderecoEmpresa : endereco;
+    usuario         : usuario;
+  end;
+
+
+
+  {INFORMAÇÕES DO PRODUTO}
+   infProduto = class
+      descricao:string;
+      codigoBarras:string;
+      codigoInterno:string;
+      medida:string;
+      ncm:string;
+      cest:string;
+      codigoOrigem:Int64; // 0 Nacional, exceto as indicadas nos códigos 3, 4, 5 e 8. // 1 Estrangeira – Importação direta, exceto a indicada no código 6 // 2 Estrangeira – Adquirida no mercado interno, exceto a indicada no código 7.s //3 Nacional, mercadoria ou bem com Conteúdo de Importação superior a 40% (quarenta por cento)  // 4 Nacional, cuja produção tenha sido feita em conformidade com os processos produtivos básicos (PPB) // 5 Nacional, mercadoria ou bem com Conteúdo de Importação inferior ou igual a 40% (quarenta por cento). // 6 Estrangeira – Importação direta, sem similar nacional, constante em lista de Resolução CAMEX e gás natural. // 7 Estrangeira – Adquirida no mercado interno, sem similar nacional, constante em lista de Resolução CAMEX e gás natural. //  8 Nacional, mercadoria ou bem com Conteúdo de Importação superior a 70% (setenta por cento).
+      ibptMunicipal,
+      ibptEstadual,
+      ibptFederal:Currency;
+      cfopInterno:Int64;
+      cfopExterno:Int64;
+      codigoAnp:string;
+      descricaoAnp:string;
+      preco:currency;
+      peso:currency;
+      observacoes:string;
+    end;
+
+   cfopInterno = class
+     descricao:string;
+     cfop:Int64;
+    end;
+
+   cfopExterno = class
+     descricao:string;
+     cfop:Int64;
+    end;
+
+   origem = class
+     descricao:string;
+     codigo:Int64;
+    end;
+
+   perfilTributario = class
+     nomePerfil:string;
+     codigo:string;
+    end;
+
+   bcIcms = class
+     nomePerfil:string;
+     codigo:Int64;
+     cnpjFrabricante:Int64;
+     codigoBenfFiscal:Int64;
+    end;
+
+   impostoProduto = class
+     cfopInterno : cfopInterno;
+     cfopExterno : cfopExterno;
+     origem      : origem;
+     bcIcms      : bcIcms;
+    end;
+
+   produto = class
+     infProduto       : infProduto;
+     tributos         : perfilTributario;
+    end;
+
+
+
+    formasPagamento = class
+     dinheiro,
+     credito,
+     debito:string;
+   end;
+
+
+
+   notasFiscais = class
+    enviadas,
+    canceladas,
+    unitilizadas,
+    pendentes:string;
+   end;
+
+   cadastros = class
+    produtos,
+    clientes,
+    transportadoras,
+    impostos:string;
+   end;
+
+
+
+     {RETORNO DASHBOARD}
+  dashboard = class
+    cadastros    : cadastros;
+    notasFiscais : notasFiscais
+  end;
+
+
+
+implementation
+
+end.

@@ -1,0 +1,90 @@
+unit IndicacaoService;
+
+interface
+
+uses
+  XData.Server.Module,
+  XData.Service.Common,
+  parametros,
+  Json,
+  funcoes,
+  indicacao,
+  System.SysUtils;
+
+type
+  [ServiceContract]
+  Iindicacoes= interface(IInvokable)
+    ['{04FB9CCB-F5E2-477C-9AD3-639CCB8D5592}']
+    [httpget]function  indicador([FromPath] codigoIndicador:string):TJSONObject;
+    [httpget]function indicacoes(pagina:Integer;registros:Integer):TJSONObject;
+  end;
+
+  [ServiceImplementation]
+  TIindicacoes = class(TInterfacedObject, Iindicacoes)
+  private
+
+   function  indicador(codigoIndicador:string):TJSONObject;
+   function  indicacoes(pagina,registros:Integer):TJSONObject;
+  end;
+
+implementation
+
+
+
+ {}
+function TIindicacoes.indicacoes(pagina,registros: Integer): TJSONObject;
+ var
+   usuario    : TJSONObject;
+   resultado  : TJSONObject;
+ begin
+     usuario           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuario.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado :=  indicacao.busca_indicacoes(usuario.P['mensagemRetorno'].FindValue('codigoIndicacao').Value,pagina,registros);   //  (descricao,cpfCnpj,codigo,registro,pagina,usuario.P['mensagemRetorno'].FindValue('mensagem').Value);
+            if resultado.FindValue('codigoHttp').Value = '200' then
+               begin
+                result      := TJSonObject.ParseJSONValue(resultado.P['dadosRetorno'].ToString) as TJSonObject;
+               end else
+                   begin
+                    result  :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+                   end;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').Value));
+      end else
+           begin
+            result := TJSonObject.ParseJSONValue(usuario.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(usuario.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+function TIindicacoes.indicador(codigoIndicador: string): TJSONObject;
+  var
+   resultado      : TJSONObject;
+   usuarioADM     : TJSONObject;
+ begin
+   usuarioADM    := verificaTokenADM(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+
+    if usuarioADM.FindValue('codigoHttp').Value = '200' then
+      begin
+            resultado  :=  indicacao.busca_indicador(codigoIndicador);
+            if resultado.FindValue('codigoHttp').Value = '200' then
+               begin
+                result      := TJSonObject.ParseJSONValue(resultado.P['dadosRetorno'].ToString) as TJSonObject;
+               end else
+                   begin
+                    result  :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+                   end;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').Value));
+      end else
+           begin
+             funcoes.statusHTTP(strtoint(usuarioADM.FindValue('codigoHttp').Value));
+             result  := TJSonObject.ParseJSONValue(usuarioADM.P['mensagemRetorno'].ToString) as TJSonObject;
+           end;
+ end;
+
+
+
+initialization
+  RegisterServiceType(TypeInfo(Iindicacoes));
+  RegisterServiceType(TIindicacoes);
+end.
+

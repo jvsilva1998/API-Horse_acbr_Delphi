@@ -1,0 +1,30 @@
+object dm_dados: Tdm_dados
+  OldCreateOrder = False
+  Height = 222
+  Width = 161
+  object conexao: TFDConnection
+    Params.Strings = (
+      'Database=vendaki'
+      'User_Name=postgres'
+      'Password=2236'
+      'DriverID=PG')
+    LoginPrompt = False
+    Left = 56
+    Top = 32
+  end
+  object conLogError: TFDConnection
+    Params.Strings = (
+      'Database=./logs/erros.s3db'
+      'DriverID=SQLite')
+    Left = 56
+    Top = 88
+  end
+  object conCalll: TFDConnection
+    Params.Strings = (
+      'Database=./logs/chamadas.s3db'
+      'DriverID=SQLite')
+    LoginPrompt = False
+    Left = 56
+    Top = 152
+  end
+end

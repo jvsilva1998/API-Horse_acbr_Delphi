@@ -1,0 +1,32 @@
+program ApiVendaki;
+
+uses
+  Vcl.Forms,
+  fm_principal in 'fm_principal.pas' {principal},
+  dm_data in 'dm_data.pas' {dm_dados: TDataModule},
+  parametros in 'parametros.pas',
+  funcoes in 'funcoes.pas',
+  retornos in 'retornos.pas',
+  cliente in 'regras\cliente.pas',
+  imposto in 'regras\imposto.pas',
+  produto in 'regras\produto.pas',
+  transportadora in 'regras\transportadora.pas',
+  usuario in 'regras\usuario.pas',
+  ClienteService in 'servicos\ClienteService.pas',
+  impostoService in 'servicos\impostoService.pas',
+  ProdutoService in 'servicos\ProdutoService.pas',
+  TransportadoraService in 'servicos\TransportadoraService.pas',
+  usuariosService in 'servicos\usuariosService.pas' {$R *.res},
+  natureza in 'regras\natureza.pas',
+  naturezaService in 'servicos\naturezaService.pas',
+  AppService in 'servicos\AppService.pas';
+
+{$R *.res}
+
+begin
+  Application.Initialize;
+  Application.MainFormOnTaskbar := True;
+  Application.CreateForm(Tprincipal, principal);
+  Application.CreateForm(Tdm_dados, dm_dados);
+  Application.Run;
+end.

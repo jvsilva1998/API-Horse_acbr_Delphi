@@ -1,0 +1,584 @@
+unit cliente;
+
+interface
+
+uses
+ System.SysUtils,
+ System.Classes,
+ vcl.forms,
+ Vcl.Dialogs,
+ FireDAC.Comp.Client,
+ parametros,
+ System.JSON,
+ DataSet.Serialize,
+
+ //retornos,
+ Data.DB;
+
+
+ function cadastra_cliente(dados:parametros.clientes;cod_usuario:string): TJSONObject;
+ function remover_cliente(codigo_cliente,cod_usuario:string):TJSONObject;
+ function alterar_cliente(codigo_cliente:string;dados:parametros.clientes;cod_usuario:string):TJSONObject;
+ function buscar_cliente(nome,cnpj,codigo:string;registro,pagina:integer;cod_usuario:string):TJSonObject;
+
+
+implementation
+
+uses funcoes;
+
+ {CADASTRO DE CLIENTES}
+ function cadastra_cliente(dados:parametros.clientes;cod_usuario:string): TJSONObject;
+  var
+   query              : TFDQuery;
+   conexao            : TFDConnection;
+   codigo             : string;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     dados.cpfCnpj      := somenteNumeros(dados.cpfCnpj);
+     dados.ie           := somenteNumeros(dados.ie);
+     dados.im           := somenteNumeros(dados.im);
+     dados.cep          := somenteNumeros(dados.cep);
+
+
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+      with query.Params do
+        begin
+            with Add do
+             begin
+              Name      := 'NOME';
+              ParamType := ptInput;
+              DataType  := ftString;
+
+              Name      := 'CIDADE';
+              ParamType := ptInput;
+              DataType  := ftString;
+
+              Name      := 'RUA';
+              ParamType := ptInput;
+              DataType  := ftString;
+
+              Name      := 'BAIRRO';
+              ParamType := ptInput;
+              DataType  := ftString;
+
+              Name      := 'FANTASIA';
+              ParamType := ptInput;
+              DataType  := ftString;
+
+              Name      := 'PAIS';
+              ParamType := ptInput;
+              DataType  := ftString;
+             end;
+        end;
+
+     try
+           conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+
+         if dados.codigoPais <> 1058 then
+            begin
+              if dados.cpfCnpj <> '' then
+                 begin
+                     query.SQL.Clear; // VERIFICA SE O CLIENTE EXISTE//////////////////////
+                     query.Close;
+                     query.SQL.Add('SELECT cod_cliente FROM clientes WHERE cpf_cnpj = '''+dados.cpfCnpj+''' and cod_usuario = '''+cod_usuario+'''');
+                     query.Open;
+
+                    if query.RowsAffected > 0 then
+                        begin
+                             codigoHttp     := 409;
+                             tituloMensagem := 'não foi possivel cadastrar cliente';
+                             mensagem       := 'O cliente já existe';
+
+                             json := '{ '+
+                                     '  "mensagemRetorno": {  '+
+                                     '   "titulo": "'+ tituloMensagem  +'", '+
+                                     '   "mensagem": "'+ mensagem  +'" '+
+                                     ' }, '+
+                                     ' "dadosRetorno": [], '+
+                                     ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                                     ' }' ;
+
+                            Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                            freeandnil(query);
+                            FreeAndNil(conexao);
+                            Exit;
+                        end;
+                 end;
+            end else
+                  begin
+                     query.SQL.Clear; // VERIFICA SE O CLIENTE EXISTE//////////////////////
+                     query.Close;
+                     query.SQL.Add('SELECT cod_cliente FROM clientes WHERE cpf_cnpj = '''+dados.cpfCnpj+''' and cod_usuario = '''+cod_usuario+'''');
+                     query.Open;
+
+                    if query.RowsAffected > 0 then
+                        begin
+                             codigoHttp     := 409;
+                             tituloMensagem := 'não foi possivel cadastrar cliente';
+                             mensagem       := 'O cliente já existe';
+
+                             json := '{ '+
+                                     '  "mensagemRetorno": {  '+
+                                     '   "titulo": "'+ tituloMensagem  +'", '+
+                                     '   "mensagem": "'+ mensagem  +'" '+
+                                     ' }, '+
+                                     ' "dadosRetorno": [], '+
+                                     ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                                     ' }' ;
+
+                            Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                            freeandnil(query);
+                            FreeAndNil(conexao);
+                            Exit;
+                        end;
+                  end;
+
+
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+           codigo := funcoes.trigger;
+           query.SQL.Clear;
+           query.SQL.Add
+           ('INSERT INTO CLIENTES  (nome_razao,'+
+                                   'fantasia_apelido,'+
+                                   'tipo_cliente,'+
+                                   'tipo_contribuinte,'+
+                                   'cpf_cnpj,'+
+                                   'ie,'+
+                                   'im,'+
+                                   'endereco,'+
+                                   'numero,'+
+                                   'complemento,'+
+                                   'bairro,'+
+                                   'cidade,'+
+                                   'telefone,'+
+                                   'celular,'+
+                                   'email,'+
+                                   'uf,'+
+                                   'cep,'+
+                                   'obs,'+
+                                   'cod_cidade,'+
+                                   'cod_cliente,'+
+                                   'hora_cadastro,'+
+                                   'data_cadastro,'+
+                                   'pais,'+
+                                   'codigo_pais,'+
+                                   'cod_usuario)values(');
+           query.SQL.Add(':NOME');
+           query.SQL.Add(',:FANTASIA');
+           query.SQL.Add(',''' +IntToStr(dados.tipoCliente)+ '''');
+           query.SQL.Add(',''' +IntToStr(dados.tipoContribuinte)+ '''');
+           query.SQL.Add(',''' +funcoes.RemoveAcento(dados.cpfCnpj)+ '''');
+           query.SQL.Add(',''' +funcoes.RemoveAcento(dados.ie)+ '''');
+           query.SQL.Add(',''' +funcoes.RemoveAcento(dados.im)+ '''');
+           query.SQL.Add(',:RUA');
+           query.SQL.Add(',''' +funcoes.RemoveAcento(dados.numero)+ '''');
+           query.SQL.Add(',''' +funcoes.RemoveAcento(dados.complemento)+ '''');
+           query.SQL.Add(',:BAIRRO');
+           query.SQL.Add(',:CIDADE');
+           query.SQL.Add(',''' +funcoes.RemoveAcento(dados.telefone)+ '''');
+           query.SQL.Add(',''' +funcoes.RemoveAcento(dados.celular)+ '''');
+           query.SQL.Add(',''' +funcoes.RemoveAcento(dados.email)+ '''');
+           query.SQL.Add(',''' +funcoes.RemoveAcento(dados.uf)+ '''');
+           query.SQL.Add(',''' +funcoes.RemoveAcento(dados.cep)+ '''');
+           query.SQL.Add(',''' +funcoes.RemoveAcento(dados.obs)+ '''');
+           query.SQL.Add(',''' +funcoes.somenteNumeros(dados.codigoCidade)+'''');
+           query.SQL.Add(',''' +codigo+ '''');
+           query.SQL.Add(',''' +timetostr(now)+'''');
+           query.SQL.Add(',''' +datetostr(now)+'''');
+           query.SQL.Add(',:PAIS');
+           query.SQL.Add(',''' +IntToStr(dados.codigoPais)+ '''');
+           query.SQL.Add(',''' +cod_usuario+ ''')');
+           query.ParamByName('NOME').AsString      := dados.nomeRazao;
+           query.ParamByName('RUA').AsString       := dados.endereco;
+           query.ParamByName('BAIRRO').AsString    := dados.bairro;
+           query.ParamByName('CIDADE').AsString    := dados.cidade;
+           query.ParamByName('FANTASIA').AsString  := dados.fantasiaApelido;
+           query.ParamByName('PAIS').AsString      := dados.pais;
+           query.ExecSQL;
+
+           if query.RowsAffected = 1 then
+              begin
+                tituloMensagem := 'Cliente cadastrado';
+                mensagem       := codigo;
+                codigoHttp     := 201;
+              end;
+             except
+              on E: Exception do
+               begin
+                tituloMensagem := 'Erro interno';
+                mensagem       := funcoes.RemoveAcento(e.Message);
+                codigoHttp     := 500;
+                funcoes.logErro(e.Message);
+               end;
+
+
+     end;
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": [], '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+    Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+    freeandnil(query);
+    FreeAndNil(conexao);
+  end;
+
+ {REMOVER}
+ function remover_cliente(codigo_cliente,cod_usuario:string):TJSONObject;
+   var
+   query              : TFDQuery;
+   conexao            : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+        try
+         conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+         query.SQL.Add('DELETE FROM CLIENTES WHERE cod_cliente = '''+codigo_cliente+''' and cod_usuario = '''+cod_usuario+'''');
+         query.ExecSQL;
+
+          if query.RowsAffected = 1 then
+                begin
+                   codigoHttp     := 200;
+                   tituloMensagem := 'Tudo certo';
+                   mensagem       := 'Cliente removido';
+                end else
+                     begin
+                       codigoHttp     := 404;
+                       tituloMensagem := 'Não foi possivel remover';
+                       mensagem       := 'Cliente não existe';
+                     end;
+           except
+            on E: Exception do
+             begin
+               codigoHttp     := 500;
+               tituloMensagem := 'Erro interno';
+               mensagem       := funcoes.RemoveAcento(e.Message);
+             end;
+        end;
+
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": [], '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+    Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+    freeandnil(query);
+    FreeAndNil(conexao);
+  end;
+
+ {ALTERAR CLIENTE}
+ function alterar_cliente(codigo_cliente:string;dados:parametros.clientes;cod_usuario:string):TJSONObject;
+  var
+   query              : TFDQuery;
+   conexao            : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+   cnpjUsado          : string;
+  begin
+     dados.cpfCnpj      := somenteNumeros(dados.cpfCnpj);
+     dados.ie           := somenteNumeros(dados.ie);
+     dados.im           := somenteNumeros(dados.im);
+     dados.cep          := somenteNumeros(dados.cep);
+
+     conexao            := TFDConnection.Create(nil);
+     query              := TFDQuery.Create(nil);
+     query.Connection   := conexao;
+
+           with query.Params do
+        begin
+            with Add do
+             begin
+              Name      := 'NOME';
+              ParamType := ptInput;
+              DataType  := ftString;
+
+              Name      := 'CIDADE';
+              ParamType := ptInput;
+              DataType  := ftString;
+
+              Name      := 'RUA';
+              ParamType := ptInput;
+              DataType  := ftString;
+
+              Name      := 'BAIRRO';
+              ParamType := ptInput;
+              DataType  := ftString;
+
+              Name      := 'FANTASIA';
+              ParamType := ptInput;
+              DataType  := ftString;
+
+              Name      := 'PAIS';
+              ParamType := ptInput;
+              DataType  := ftString;
+             end;
+        end;
+
+
+        try
+            //VERIFICA SE EXITE O CLIENTE QUE QUER ATUALIZAR///////////////////////////////////////////////////////
+             conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+
+             query.Close;
+             query.SQL.Add('SELECT cpf_cnpj FROM clientes WHERE cod_cliente = '''+codigo_cliente+''' AND cod_usuario = '''+cod_usuario+'''');
+             query.Open;
+
+             cnpjUsado :=  query.FieldByName('cpf_cnpj').AsString;
+
+             query.SQL.Clear;
+             query.Close;
+             query.SQL.Add('SELECT cod_cliente FROM clientes WHERE cpf_cnpj = '''+dados.cpfCnpj+''' and cod_usuario = '''+cod_usuario+'''');
+             query.Open;
+
+             if query.RowsAffected >= 1 then
+                begin
+                  if cnpjUsado <> dados.cpfCnpj then
+                           begin
+                             codigoHttp      := 409;
+                             tituloMensagem  := 'não foi possivel alterar cliente';
+                             mensagem        := 'o cliente já existe';
+                             json            := '{ '+
+                                     '  "mensagemRetorno": {  '+
+                                     '   "titulo": "'+ tituloMensagem  +'", '+
+                                     '   "mensagem": "'+ mensagem  +'" '+
+                                     ' }, '+
+                                     ' "dadosRetorno":[],'+
+                                     ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                                     ' }' ;
+
+                              Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                              freeandnil(query);
+                              FreeAndNil(conexao);
+                             Exit;
+                           end;
+                end;
+
+            //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+           query.SQL.Clear;
+           query.SQL.Add('UPDATE CLIENTES SET nome_razao=:NOME');
+           query.SQL.Add(',fantasia_apelido=:FANTASIA');
+           query.SQL.Add(',tipo_cliente= ''' + IntToStr(dados.tipoCliente) + '''');
+           query.SQL.Add(',tipo_contribuinte= ''' +IntToStr(dados.tipoContribuinte)+ '''');
+           query.SQL.Add(',cpf_cnpj= ''' +funcoes.RemoveAcento(dados.cpfCnpj)+ '''');
+           query.SQL.Add(',ie= ''' + dados.ie + '''');
+           query.SQL.Add(',im= ''' + dados.im + '''');
+           query.SQL.Add(',endereco=:RUA');
+           query.SQL.Add(',numero= ''' + funcoes.RemoveAcento(dados.numero)+ '''');
+           query.SQL.Add(',complemento= ''' + funcoes.RemoveAcento(dados.complemento)+ '''');
+           query.SQL.Add(',bairro=:BAIRRO');
+           query.SQL.Add(',cidade=:CIDADE');
+           query.SQL.Add(',telefone= ''' + funcoes.RemoveAcento(dados.telefone)+ '''');
+           query.SQL.Add(',celular= ''' + funcoes.RemoveAcento(dados.celular)+ '''');
+           query.SQL.Add(',email= '''+funcoes.RemoveAcento(dados.email)+ '''');
+           query.SQL.Add(',uf= ''' + funcoes.RemoveAcento(dados.uf)+ '''');
+           query.SQL.Add(',cep= ''' + funcoes.RemoveAcento(dados.cep)+ '''');
+           query.SQL.Add(',obs= ''' + funcoes.RemoveAcento(dados.obs) + '''');
+           query.SQL.Add(',pais=:PAIS');
+           query.SQL.Add(',codigo_pais= ''' + IntToStr(dados.codigoPais)+ '''');
+           query.SQL.Add(',cod_cidade= ''' +funcoes.somenteNumeros(dados.codigoCidade)+ '''');
+           query.SQL.Add('WHERE cod_cliente = '''+codigo_cliente +''' AND cod_usuario = '''+cod_usuario+'''');
+           query.ParamByName('NOME').AsString      := dados.nomeRazao;
+           query.ParamByName('RUA').AsString       := dados.endereco;
+           query.ParamByName('BAIRRO').AsString    := dados.bairro;
+           query.ParamByName('CIDADE').AsString    := dados.cidade;
+           query.ParamByName('FANTASIA').AsString  := dados.fantasiaApelido;
+           query.ParamByName('PAIS').AsString      := dados.pais;
+           query.ExecSQL;
+
+            if query.RowsAffected = 1 then
+                begin
+                   codigoHttp         := 200;
+                   tituloMensagem     := 'Tudo certo';
+                   mensagem           := 'Cliente atualizado com sucesso';
+                end else
+                     begin
+                      codigoHttp      := 404;
+                      tituloMensagem  := 'não foi possivel atualizar o cliente';
+                      mensagem        := 'o cliente não existe';
+                     end;
+
+           except
+            on E: Exception do
+             begin
+              codigoHttp      := 500;
+              tituloMensagem  := 'Ero interno';
+              mensagem        := funcoes.RemoveAcento(e.Message);
+              funcoes.logErro(e.Message);
+             end;
+        end;
+         json            := '{ '+
+                 '  "mensagemRetorno": {  '+
+                 '   "titulo": "'+ tituloMensagem  +'", '+
+                 '   "mensagem": "'+ mensagem  +'" '+
+                 ' }, '+
+                 ' "dadosRetorno":[],'+
+                 ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                 ' }' ;
+
+          Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+          freeandnil(query);
+          FreeAndNil(conexao);
+  end;
+
+ {BUSCAR CLIENTE}
+ function buscar_cliente(nome,cnpj,codigo:string;registro,pagina:integer;cod_usuario:string):TJSonObject;
+  var
+   query              : TFDQuery;
+   LJSONArray         : TJSONArray;
+   codigoif           : string;
+   conexao            : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   dados              : string;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+
+     cnpj             := funcoes.somenteNumeros(cnpj);
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+
+    if codigo <> '%' then
+       begin
+        codigoif := 'and cod_cliente = '''+codigo+'''';
+       end else
+             begin
+               codigoif := 'and cod_cliente like ''%'+codigo+'%''';
+             end;
+
+
+        try
+               conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+               query.Close;
+               query.SQL.Add(' SELECT '+
+                             ' nome_razao'+
+                             ',fantasia_apelido'+
+                             ',tipo_cliente'+
+                             ',tipo_contribuinte'+
+                             ',cpf_cnpj'+
+                             ',ie'+
+                             ',im'+
+                             ',endereco'+
+                             ',numero'+
+                             ',complemento'+
+                             ',bairro'+
+                             ',cidade'+
+                             ',telefone'+
+                             ',celular'+
+                             ',email'+
+                             ',uf'+
+                             ',cep'+
+                             ',obs'+
+                             ',cod_cidade'+
+                             ',pais'+
+                             ',codigo_pais'+
+                             ',cod_cliente'+
+                             ' FROM CLIENTES where cpf_cnpj like ''%'+cnpj+'%'' AND nome_razao like ''%'+nome+'%'' '+codigoif+'  AND cod_usuario='''+cod_usuario+''' ORDER BY nome_razao ASC LIMIT '+IntToStr(pagina-1)+','+IntToStr(registro)+'  ');
+               query.Open;
+
+               if  query.RowsAffected = 0  then
+                  begin
+                     codigoHttp      := 404;
+                     tituloMensagem  := 'nenhum encontrado';
+                     mensagem        := 'Nenhum cliente encontrado';
+                  end else
+                       begin
+                          codigoHttp := 200;
+                          LJSONArray            := query.ToJSONArray;
+                          dados := '"clientes":'+ LJSONArray.Format;
+                          LJSONArray.Free;
+                       end;
+           except
+            on E: Exception do
+             begin
+               codigoHttp      := 500;
+               tituloMensagem  := 'Erro interno';
+               mensagem        := funcoes.RemoveAcento(e.Message);
+             end;
+        end;
+
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": { '+ dados +'}, '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+end.

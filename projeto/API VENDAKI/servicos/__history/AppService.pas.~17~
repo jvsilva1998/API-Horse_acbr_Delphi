@@ -1,0 +1,100 @@
+unit AppService;
+
+interface
+
+uses
+  XData.Server.Module,
+  XData.Service.Common,
+  parametros,
+  Json,
+  funcoes,
+  retornos,
+  app,
+  System.SysUtils;
+
+type
+  [ServiceContract]
+  Iapp= interface(IInvokable)
+    ['{04FB9CCB-F5E2-477C-9AD3-639CCB8D5592}']
+   [Route('/campanhas/campanha')] [httppost]   function  campanha(dados:parametros.campanha):TJSONObject;
+   [Route('/campanhas/clique')] [httppost]     function  clique([FromPath]idCampanha:string):TJSONObject;
+
+   [Route('/campanhas/remover')]  [HttpDelete] function  remover([FromPath]codigo:string):TJSONObject;
+   [httpget] function dashboard:TJSONObject;
+
+  end;
+
+  [ServiceImplementation]
+  TIapp = class(TInterfacedObject, Iapp)
+  private
+     function  campanha(dados:parametros.campanha):TJSONObject;
+     function  remover(codigo:string):TJSONObject;
+     function  dashboard:TJSONObject;
+     function  clique(idCampanha:string):TJSONObject;
+  end;
+
+implementation
+
+{TItransportadoras}
+
+
+function TIapp.campanha(dados: parametros.campanha): TJSONObject;  //CRIAR CAMPANHA//
+ begin
+
+ end;
+
+
+ //CLIQUE NA CAMPANHA//
+function TIapp.clique(idCampanha: string): TJSONObject;
+  var
+   resultado      : TJSONObject;
+   codigo_usuario : string;
+ begin
+       codigo_usuario := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if codigo_usuario <> '' then
+      begin
+            resultado  :=  app.clickCampanha(idCampanha,codigo_usuario);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result    := TJSonObject.ParseJSONValue(retornos.retorno) as TJSonObject;
+           end;
+ end;
+
+function TIapp.dashboard: TJSONObject;   //DASHBOARD APP//
+ var
+   codigo_usuario : string;
+   resultado      : TJSONObject;
+ begin
+       codigo_usuario := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if codigo_usuario <> '' then
+      begin
+            resultado := app.dashboard(codigo_usuario);
+
+            if resultado.FindValue('codigoHttp').Value = '200' then
+               begin
+                result      := TJSonObject.ParseJSONValue(resultado.P['dadosRetorno'].ToString) as TJSonObject;
+               end else
+                   begin
+                    result  :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+                   end;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').Value));
+      end else
+           begin
+            result    := TJSonObject.ParseJSONValue(retornos.retorno) as TJSonObject;
+           end;
+ end;
+
+ //REMOVER CAMPANHA//
+function TIapp.remover(codigo: string): TJSONObject;
+ begin
+
+ end;
+
+initialization
+  RegisterServiceType(TypeInfo(Iapp));
+  RegisterServiceType(TIapp);
+
+end.
+

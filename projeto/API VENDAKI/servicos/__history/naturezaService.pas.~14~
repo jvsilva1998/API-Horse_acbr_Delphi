@@ -1,0 +1,106 @@
+unit naturezaService;
+
+interface
+
+uses
+  XData.Server.Module,
+  XData.Service.Common,
+  parametros,
+  Json,
+  funcoes,
+  natureza,
+  retornos;
+
+type
+  [ServiceContract]
+  Inaturezas= interface(IInvokable)
+    ['{04FB9CCB-F5E2-477C-9AD3-639CCB8D5592}']
+    [httppost]function   cadastrar(dados:parametros.naturezas):TJSONObject;
+    [httpdelete]function remover([FromPath]  codigo:string):TJSONObject;
+    [httpput]function    alterar([FromPath]  codigo:string;dados:parametros.naturezas):TJSONObject;
+    [httpget]function    buscar(registro,pagina:integer):TJSONObject;
+  end;
+
+  [ServiceImplementation]
+  TInaturezas = class(TInterfacedObject, Inaturezas)
+  private
+     function cadastrar(dados:parametros.naturezas):TJSONObject;
+     function remover(codigo:string):TJSONObject;
+     function alterar(codigo:string; dados:parametros.naturezas):TJSONObject;
+     function buscar(registro,pagina:integer):TJSONObject;
+  end;
+
+implementation
+
+{TItransportadoras}
+
+
+function TInaturezas.alterar(codigo: string;dados: parametros.naturezas): TJSONObject;
+    var
+  resultado :integer;
+ begin
+    if funcoes.verificaTokenlogado(TXDataOperationContext.Current.Request.Headers.Get('Authorization')) = true then
+      begin
+            resultado :=   natureza.altera_natureza(codigo,dados);
+            result := TJSonObject.ParseJSONValue(retornos.retorno) as TJSonObject;
+            funcoes.statusHTTP(resultado);
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(retornos.retorno) as TJSonObject;
+           end;
+ end;
+
+
+
+function TInaturezas.buscar(registro,pagina:integer): TJSONObject;
+ var
+  resultado :integer;
+ begin
+    if funcoes.verificaTokenlogado(TXDataOperationContext.Current.Request.Headers.Get('Authorization')) = true then
+      begin
+            resultado := natureza.busca_natureza(registro,pagina);
+            result    := TJSonObject.ParseJSONValue(funcoes.ResultadoJson) as TJSonObject;
+            funcoes.statusHTTP(resultado);
+      end else
+           begin
+            result := TJSonObject.ParseJSONValue(funcoes.JsonNegado) as TJSonObject;
+           end;
+ end;
+
+
+function TInaturezas.cadastrar(dados: parametros.naturezas): TJSONObject;
+  var
+  resultado :integer;
+ begin
+    if funcoes.verificaTokenlogado(TXDataOperationContext.Current.Request.Headers.Get('Authorization')) = true then
+      begin
+            resultado :=  natureza.cadastro_natureza(dados);
+            result := TJSonObject.ParseJSONValue(retornos.retorno) as TJSonObject;
+            funcoes.statusHTTP(resultado);
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(retornos.retorno) as TJSonObject;
+           end;
+ end;
+
+function TInaturezas.remover(codigo: string): TJSONObject;
+  var
+  resultado :integer;
+ begin
+    if funcoes.verificaTokenlogado(TXDataOperationContext.Current.Request.Headers.Get('Authorization')) = true then
+      begin
+            resultado :=  natureza.remove_natureza(codigo);
+            result := TJSonObject.ParseJSONValue(retornos.retorno) as TJSonObject;
+            funcoes.statusHTTP(resultado);
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(retornos.retorno) as TJSonObject;
+           end;
+ end;
+
+initialization
+  RegisterServiceType(TypeInfo(Inaturezas));
+  RegisterServiceType(TInaturezas);
+
+end.
+

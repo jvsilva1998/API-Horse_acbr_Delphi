@@ -1,0 +1,334 @@
+unit natureza;
+
+interface
+
+uses
+ System.SysUtils,
+ System.Classes,
+ vcl.forms,
+ Vcl.Dialogs,
+ FireDAC.Comp.Client,
+ parametros,
+ DataSet.Serialize,
+ System.JSON,
+ retornos,
+ EncdDecd;
+
+ function cadastro_natureza(dados:naturezas;cod_usuario:string):TJSONObject;
+ function remove_natureza(codigo:string;cod_usuario:string):TJSONObject;
+ function altera_natureza(codigo:string;dados:naturezas;cod_usuario:string):TJSONObject;
+ function busca_natureza(descricao:string;registro,pagina:integer;cod_usuario:string):TJSONObject;
+ function verificaNome(nome,codigoUsuario:string;conexao:TFDConnection):Boolean;
+
+
+
+implementation
+
+uses dm_data, funcoes;
+
+
+ {CADASTRO}
+ function cadastro_natureza(dados:naturezas;cod_usuario:string):TJSONObject;
+  var
+   query          : TFDQuery;
+   conexao        : TFDConnection;
+   codigo         : string;
+   json           : string;
+   codigoHttp     : integer;
+   mensagem       : string;
+   tituloMensagem : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+         codigo := funcoes.trigger;
+
+        try
+         conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+
+         if verificaNome(dados.descricao,cod_usuario,conexao)= false then
+             begin
+              tituloMensagem := 'Não foi possivel cadastrar';
+              mensagem       := 'Já existe uma natureza com esse nome';
+              codigoHttp     := 409;
+               json := '{ '+
+                       '  "mensagemRetorno": {  '+
+                       '   "titulo": "'+ tituloMensagem  +'", '+
+                       '   "mensagem": "'+ mensagem  +'" '+
+                       ' }, '+
+                       ' "dadosRetorno": [], '+
+                       ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                       ' }' ;
+
+              Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+              freeandnil(query);
+              FreeAndNil(conexao);
+              Exit;
+             end;
+
+         query.SQL.Add
+         ('INSERT INTO naturezas (descricao,'+
+                                 'codFinalidade,'+
+                                 'cfopestadual,'+
+                                 'cfopinterestadual,'+
+                                 'dataCadastro,'+
+                                 'horaCadastro,'+
+                                 'cod_natureza,'+
+                                 'cod_usuario)values(');
+         query.SQL.Add(''''  +funcoes.RemoveAcento(dados.descricao)+'''');
+         query.SQL.Add(',''' +IntToStr(dados.codFinalidade)+ '''');
+         query.SQL.Add(',''' +IntToStr(dados.cfopEstadual)+ '''');
+         query.SQL.Add(',''' +IntToStr(dados.cfopInterEstadual)+ '''');
+         query.SQL.Add(',''' +funcoes.formataData(DateToStr(now))+'''');
+         query.SQL.Add(',''' +timetostr(now)+'''');
+         query.SQL.Add(',''' +codigo+ '''');
+         query.SQL.Add(',''' +cod_usuario+ ''')');
+         query.ExecSQL;
+
+         if query.RowsAffected = 1 then
+            begin
+             tituloMensagem := 'Natureza cadastrada';
+             mensagem       := codigo;
+             codigoHttp     := 201;
+            end;
+
+           except
+            on E: Exception do
+             begin
+               tituloMensagem := 'Erro interno';
+               mensagem       := funcoes.RemoveAcento(e.Message);
+               codigoHttp     := 500;
+               funcoes.logErro(e.Message);
+             end;
+        end;
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": [], '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+    Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+    freeandnil(query);
+    FreeAndNil(conexao);
+  end;
+
+ {REMOVER}
+ function remove_natureza(codigo:string;cod_usuario:string):TJSONObject;
+   var
+   query: TFDQuery;
+   conexao : TFDConnection;
+   json           : string;
+   codigoHttp     : integer;
+   mensagem       : string;
+   tituloMensagem : string;
+ begin
+
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+        try
+         conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+         query.SQL.Add('DELETE FROM naturezas WHERE cod_natureza = '''+codigo+''' and cod_usuario = '''+cod_usuario+'''');
+         query.ExecSQL;
+
+          if query.RowsAffected = 1 then
+                begin
+                   tituloMensagem := 'Tudo certo';
+                   mensagem       := 'Natureza removida';
+                   codigoHttp     := 200;
+                end else
+                     begin
+                       tituloMensagem := 'não foi possivel remover';
+                       mensagem       := 'Natureza não existe';
+                       codigoHttp     := 404;
+                     end;
+           except
+            on E: Exception do
+             begin
+               tituloMensagem := 'Erro interno';
+               mensagem       :=  funcoes.RemoveAcento(e.Message );
+               codigoHttp     := 500;
+             end;
+        end;
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": [], '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+    Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+    freeandnil(query);
+    FreeAndNil(conexao);
+ end;
+
+ {ALTERAR}
+ function altera_natureza(codigo:string;dados:naturezas;cod_usuario:string):TJSONObject;
+  var
+   query   : TFDQuery;
+   conexao : TFDConnection;
+   json           : string;
+   codigoHttp     : integer;
+   mensagem       : string;
+   tituloMensagem : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+        try
+           conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+
+           query.SQL.Add('UPDATE naturezas SET descricao= ''' + funcoes.RemoveAcento(dados.descricao)+ '''');
+           query.SQL.Add(',codFinalidade= ''' +IntToStr(dados.codFinalidade)+ '''');
+           query.SQL.Add(',cfopestadual= ''' +IntToStr(dados.cfopEstadual)+ '''');
+           query.SQL.Add(',cfopinterestadual= ''' +IntToStr(dados.cfopInterEstadual)+ '''');
+           query.SQL.Add(' WHERE cod_natureza = '''+codigo+''' AND cod_usuario = '''+cod_usuario+'''');
+           query.ExecSQL;
+
+            if query.RowsAffected = 1 then
+                begin
+                  tituloMensagem := 'Tudo certo';
+                  mensagem       := 'Natureza atualizada';
+                  codigoHttp     := 200;
+                end else
+                     begin
+                      tituloMensagem := 'Não foi possivel atualizar';
+                      mensagem       := 'Natureza não existe';
+                      codigoHttp     := 404;
+                     end;
+           except
+            on E: Exception do
+             begin
+              tituloMensagem := 'Erro interno';
+              mensagem       :=  funcoes.RemoveAcento(e.Message);
+              codigoHttp     := 500;
+              funcoes.logErro(e.Message);
+             end;
+        end;
+
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": [], '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+    Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+    freeandnil(query);
+    FreeAndNil(conexao);
+  end;
+
+ {BUSCAR}
+ function busca_natureza(descricao:string;registro,pagina:integer;cod_usuario:string):TJSONObject;
+   var
+   query          : TFDQuery;
+   LJSONArray     : TJSONArray;
+   conexao        : TFDConnection;
+   dados          : string;
+   json           : string;
+   codigoHttp     : integer;
+   mensagem       : string;
+   tituloMensagem : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+          try
+             conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+             query.Close;
+             query.SQL.Add(' SELECT '+
+                           ' descricao'+
+                           ',codFinalidade'+
+                           ',cfopestadual'+
+                           ',cfopinterestadual'+
+                           ',cod_natureza'+
+                           ' FROM naturezas where  descricao like ''%'+descricao+'%''  and   cod_usuario='''+cod_usuario+'''  ORDER BY descricao ASC  LIMIT '+IntToStr(registro)+' OFFSET('+IntToStr(pagina)+' - 1) * '+IntToStr(registro)+' ');
+             query.Open;
+
+               if  query.RowsAffected = 0  then
+                  begin
+                     codigoHttp      := 404;
+                     tituloMensagem  := 'nenhum encontrado';
+                     mensagem        := 'Nenhuma natureza encontrada';
+                  end else
+                       begin
+                          codigoHttp := 200;
+                          LJSONArray            := query.ToJSONArray;
+                          dados := '"naturezas":'+ LJSONArray.Format;
+                          LJSONArray.Free;
+                       end;
+
+             except
+              on E: Exception do
+               begin
+                tituloMensagem := 'Erro interno';
+                mensagem       := funcoes.RemoveAcento(e.Message);
+                codigoHttp     := 500;
+                funcoes.logErro(e.Message);
+               end;
+          end;
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": { '+ dados +'}, '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+
+ {VERIFICA NOME DA NATUREZA}
+ function verificaNome(nome,codigoUsuario:string;conexao:TFDConnection):Boolean;
+  var
+   query: TFDQuery;
+  begin
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+      try
+       query.Close;
+       query.SQL.Add('SELECT  descricao from naturezas where descricao = '''+nome+'''  AND cod_usuario = '''+codigoUsuario+'''');
+       query.Open();
+
+       if query.RowsAffected <> 0 then
+           begin
+             Result := False;
+           end else
+                begin
+                  Result := True;
+                end;
+       except
+        Result := False;
+      end;
+     freeandnil(query);
+  end;
+
+
+
+
+
+
+
+
+
+
+end.
+
+
+

@@ -1,0 +1,98 @@
+unit retornos;
+
+interface
+
+uses
+ System.SysUtils,
+ System.Classes,
+ vcl.forms,
+ Vcl.Dialogs,
+ FireDAC.Comp.Client,
+
+
+ System.JSON;
+
+ type
+   resultado = class
+   tituloResposta   : string;
+   mensagemResposta : string;
+   situacaoOperacao : Boolean;
+ end;
+
+
+
+ function  RemoveAcento(const pText: string): string;
+ function  RemoveChar(STR: string;CHR: char): string;
+
+ var
+  retorno : WideString;
+
+
+
+implementation
+
+
+
+
+
+
+     {REMOVER ACENTO}
+  function RemoveAcento(const pText: string): string;
+  type
+     USAscii20127 = type AnsiString(20127);
+   begin
+    Result := string(USAscii20127(pText));
+    Result := RemoveChar(Result,#39);
+    Result := RemoveChar(Result, '"');
+   end;
+
+  {REMOVER ACENTO 2}
+  function RemoveChar(STR: string;CHR: char): string;
+     var
+	    cont : integer;
+       begin
+	      Result := '';
+	      for cont := 1 to Length(STR) do begin
+		      if (STR[cont] <> CHR) then
+			    Result := Result + STR[cont];
+	      end;
+       end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+end.

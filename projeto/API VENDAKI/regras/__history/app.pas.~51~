@@ -1,0 +1,352 @@
+unit app;
+
+interface
+
+uses
+ System.SysUtils,
+ System.Classes,
+ vcl.forms,
+ Vcl.Dialogs,
+ FireDAC.Comp.Client,
+ parametros,
+ DataSet.Serialize,
+ System.JSON,
+ EncdDecd;
+
+ function dashboard(cod_usuario:string):TJSONObject;
+ function clickCampanha(codigo,cod_usuario:string):TJSONObject;
+ function alteraTokenPush(token,cod_usuario:string):TJSONObject;
+ function cadastraCampanha(dados:parametros.campanha):TJSONObject;
+
+
+implementation
+
+uses funcoes;
+
+
+ {DASHBOARD}
+ function dashboard(cod_usuario:string):TJSONObject;
+  var
+   query              : TFDQuery;
+   conexao            : TFDConnection;
+   resultado          : TStringList;
+   jsonNotasFiscais   : string;
+   jsonCadastros      : string;
+   jsonCampanhas      : string;
+   LJSONArray         : TJSONArray;
+   json               : string;
+   codigoHttp         : integer;
+   dados              : string;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+            try
+                     // 1ª NOTAS FISCAIS //////////////////////////////////////////////////////////////////////////////////
+
+                       conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+                       resultado := TStringList.Create;
+
+
+                       resultado.Clear;
+                       query.close;
+                       query.SQL.Add('SELECT SUM(valornota)   AS TOTAL from notas_nfe   WHERE statusnota = '''+'ENVIADA'+'''   AND dataenvio > (curdate() - interval 30 day)  AND codusuario = '''+cod_usuario+''' union all '+
+                                     'SELECT count(valornota) AS TOTAL from notas_nfe   WHERE statusnota = '''+'ENVIADA'+'''   AND dataenvio > (curdate() - interval 30 day)  AND codusuario = '''+cod_usuario+''' union all '+
+                                     'SELECT SUM(valornota)   AS TOTAL from notas_nfe   WHERE statusnota = '''+'CANCELADA'+''' AND dataenvio > (curdate() - interval 30 day)  AND codusuario = '''+cod_usuario+''' union all '+
+                                     'SELECT COUNT(valornota) AS TOTAL from notas_nfe   WHERE statusnota = '''+'CANCELADA'+''' AND dataenvio > (curdate() - interval 30 day)  AND codusuario = '''+cod_usuario+''' union all '+
+                                     'SELECT COUNT(*)         AS TOTAL from eventosnfe  WHERE tipoEvento = 2 AND dataEvento > (curdate() - interval 30 day)                   AND codusuario = '''+cod_usuario+''' union all '+
+                                     'SELECT SUM(COALESCE(NULLIF(numeroFim  - numeroInicio,0),1))  FROM  inutilizacaonfe  where data > (curdate() - interval 30 day)          AND codigoUsuario = '''+cod_usuario+'''');
+
+                       query.Open;
+                       query.First;
+                         while not(query.Eof) do
+                          begin
+                           resultado.Add(CurrToStr(query.FieldByName('total').AsCurrency));
+                           query.Next;
+                          end;
+
+
+                       jsonNotasFiscais :=
+                                              '	"notasFiscais": { '+
+                                              '  "enviadas": {    '+
+                                              '  "quantidade": "'+resultado.Strings[1]+'", '+
+                                              '  "total": "'+formatfloat('###,##0.00',StrToFloat(resultado.Strings[0]))+'" '+
+                                              '  },             '+
+                                              '  "canceladas": { '+
+                                              '    "quantidade": "'+resultado.Strings[3]+'", '+
+                                              '    "total": "'+formatfloat('###,##0.00',StrToFloat(resultado.Strings[2]))+'" '+
+                                              '  }, '+
+                                              '  "corrigidas": { '+
+                                              '    "quantidade": "'+resultado.Strings[4]+'" '+
+                                              '  }, '+
+                                              '  "inutilizadas": { '+
+                                              '    "quantidade": "'+resultado.Strings[5]+'" '+
+                                              '  } '+
+                                              ' },';
+
+
+                     // 2ª CADASTROS////////////////////////////////////////////////////////////////////////////////////////
+
+                       resultado.Clear;
+                       query.SQL.Clear;
+                       query.close;
+                       query.SQL.Add('select count(*)as total from produtos          WHERE cod_usuario = '''+cod_usuario+''' union all '+
+                                     'select count(*)as total from clientes          WHERE cod_usuario = '''+cod_usuario+''' union all '+
+                                     'select count(*)as total from transportadoras   WHERE cod_usuario = '''+cod_usuario+''' union all '+
+                                     'select count(*)as total from naturezas         WHERE cod_usuario = '''+cod_usuario+''' union all '+
+                                     'select count(*)as total from perfil_tributario WHERE cod_usuario = '''+cod_usuario+'''');
+                       query.Open;
+                       query.First;
+                         while not(query.Eof) do
+                          begin
+                           resultado.Add(query.FieldByName('total').AsString);
+                           query.Next;
+                          end;
+
+                          jsonCadastros :=  '	"cadastros": { '+
+                                            '  "clientes": "'+resultado.Strings[1]+'", '+
+                                            '  "produtos": "'+resultado.Strings[0]+'", '+
+                                            '  "transportadoras": "'+resultado.Strings[2]+'", '+
+                                            '  "tributos": "'+resultado.Strings[4]+'", '+
+                                            '  "naturezas": "'+resultado.Strings[3]+'" '+
+                                            ' },';
+
+
+                      // 3ª CAMPANHAS//////////////////////////////////////////////////////////////////////////////////
+                       query.SQL.Clear;
+                       query.close;
+                       query.SQL.Add('select id_campanha,url_imagem,cor_fundo,cor_fundo2,url_destino from campanhas order by RAND()');
+                       query.Open;
+
+                       LJSONArray            := query.ToJSONArray;
+                       jsonCampanhas         := '"campanhas":'+ LJSONArray.Format+'';
+                       LJSONArray.Free;
+                       dados       := jsonNotasFiscais + jsonCadastros + jsonCampanhas;
+                       codigoHttp  := 200;
+                 except
+                  on E: Exception do
+                   begin
+                    codigoHttp     := 500;
+                    funcoes.logErro(e.Message);
+                    tituloMensagem := 'Erro iterno';
+                    mensagem       :=  funcoes.RemoveAcento(e.Message);
+                   end;
+
+            end;
+
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": { '+ dados +'}, '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+      FreeAndNil(resultado);
+  end;
+
+ {CLICK NA CAMPANHA}
+ function clickCampanha(codigo,cod_usuario:string):TJSONObject;
+   var
+   query              : TFDQuery;
+   conexao            : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+       try
+            begin
+                conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+                query.SQL.Add
+                 ('INSERT INTO desempenho_campanhas(id_campanha,'+
+                                         'id_usuario,'+
+                                         'data_click,'+
+                                         'id_click,'+
+                                         'hora_click)values(');
+                 query.SQL.Add(''''  +codigo+'''');
+                 query.SQL.Add(',''' +cod_usuario+ '''');
+                 query.SQL.Add(',''' +funcoes.formataData(DateToStr(now))+'''');
+                 query.SQL.Add(',''' +funcoes.trigger+'''');
+                 query.SQL.Add(',''' +TimeToStr(now)+ ''')');
+                 query.ExecSQL;
+
+                 if query.RowsAffected = 1 then
+                     begin
+                      tituloMensagem := 'Tudo ok';
+                      mensagem       := 'Clique registrado';
+                      codigoHttp     :=  200;
+                     end;
+            end;
+
+             except
+              on E: Exception do
+               begin
+                tituloMensagem := 'Erro interno';
+                mensagem       := funcoes.RemoveAcento(e.Message);
+                codigoHttp     := 500;
+                funcoes.logErro(e.Message);
+               end;
+       end;
+
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": [], '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+
+    Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+    freeandnil(query);
+    FreeAndNil(conexao);
+  end;
+
+ {ALTERAR TOKEN PUSH}
+ function alteraTokenPush(token,cod_usuario:string):TJSONObject;
+   var
+   query              : TFDQuery;
+   conexao            : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+       try
+            begin
+                conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+                query.SQL.Add
+                 ('UPDATE usuarios SET pushtoken = '''+token+''' WHERE codigousuario = '''+cod_usuario+'''');
+                 query.ExecSQL;
+
+                 if query.RowsAffected = 1 then
+                     begin
+                      tituloMensagem := 'Tudo ok';
+                      mensagem       := 'token push atualizado';
+                      codigoHttp     :=  200;
+                     end;
+            end;
+
+             except
+              on E: Exception do
+               begin
+                tituloMensagem := 'Erro interno';
+                mensagem       := funcoes.RemoveAcento(e.Message);
+                codigoHttp     := 500;
+                funcoes.logErro(e.Message);
+               end;
+       end;
+
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": [], '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+
+    Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+    freeandnil(query);
+    FreeAndNil(conexao);
+  end;
+
+ {INSERIR CAMPANHA}
+ function cadastraCampanha(dados:parametros.campanha):TJSONObject;     // altura:155,largura:310// https://pt-br.imgbb.com/ upload imagem
+  var
+  query              : TFDQuery;
+  conexao            : TFDConnection;
+  json               : string;
+  codigoHttp         : integer;
+  mensagem           : string;
+  tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+       try
+            begin
+                conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+                query.SQL.Add
+                 ('INSERT INTO campanhas(id_campanha,'+
+                                         'nome,'+
+                                         'data_inicio,'+
+                                         'data_fim,'+
+                                         'url_destino,'+
+                                         'url_imagem,'+
+                                         'cor_fundo,'+
+                                         'cor_fundo2,'+
+                                         'data_cadastro)values(');
+                 query.SQL.Add(''''  +funcoes.trigger+'''');
+                 query.SQL.Add(',''' +dados.nomeCampanha+ '''');
+                 query.SQL.Add(',''' +FormatDateTime('YYYY-MM-DD',dados.dataInicio)+'''');
+                 query.SQL.Add(',''' +FormatDateTime('YYYY-MM-DD',dados.dataFim)+'''');
+                 query.SQL.Add(',''' +dados.urlDestino+ '''');
+                 query.SQL.Add(',''' +dados.urlImagem+ '''');
+                 query.SQL.Add(',''' +dados.corFundo1+ '''');
+                 query.SQL.Add(',''' +dados.corFundo2+ '''');
+                 query.SQL.Add(',''' +FormatDateTime('YYYY-MM-DD',now)+ ''')');
+                 query.ExecSQL;
+
+                 if query.RowsAffected = 1 then
+                     begin
+                      tituloMensagem := 'Tudo ok';
+                      mensagem       := 'campanha inserida';
+                      codigoHttp     :=  201;
+                     end;
+            end;
+
+             except
+              on E: Exception do
+               begin
+                tituloMensagem := 'Erro interno';
+                mensagem       := funcoes.RemoveAcento(e.Message);
+                codigoHttp     := 500;
+                funcoes.logErro(e.Message);
+               end;
+       end;
+
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": [], '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+    Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+    freeandnil(query);
+    FreeAndNil(conexao);
+  end;
+
+
+
+
+
+
+
+
+
+
+
+end.

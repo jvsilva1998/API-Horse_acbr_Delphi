@@ -1,0 +1,40 @@
+unit nfce;
+
+interface
+
+uses
+  XData.Service.Common;
+
+type
+  [ServiceContract]
+  Infce = interface(IInvokable)
+    ['{49034E5D-88BF-479C-BAFF-68C9A8E1E543}']
+    [httppost]function  emitir(envia:string):boolean;
+
+    end;
+
+    [ServiceImplementation]
+      TInfce = class(TInterfacedObject, Infce)
+      private
+       function   emitir(envia:string):boolean;
+  end;
+
+
+
+implementation
+
+
+function TInfce.emitir(envia: string): boolean;
+ begin
+  result := True;
+ end;
+
+
+
+
+initialization
+    RegisterServiceType(TypeInfo(Infce));
+  RegisterServiceType(TInfce);
+
+end.
+

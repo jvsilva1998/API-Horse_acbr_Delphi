@@ -1,0 +1,644 @@
+unit produto;
+
+interface
+
+uses
+  System.SysUtils,
+  Vcl.Dialogs,
+  FireDAC.Comp.Client,
+  parametros,
+  System.JSON,
+  DataSet.Serialize;
+
+ function cadastra_produto(dados:parametros.produto;cod_usuario:string):TJSONObject;
+ function remove_produto(codigo:string;cod_usuario:string):TJSONObject;
+ function alterar_produto(codigo_produto:string;dados:parametros.produto;cod_usuario:string):TJSONObject;
+ function verificaExisteUPDATE(codigointerno:string;ean:string;codigoProduto:string;codigoCliente:string;conexao:TFDConnection):Boolean;
+ function verificaExiste(codigoInterno,ean,codigoCliente:string;conexao:TFDConnection):Boolean;
+ function buscar_produto(nome,codigo:string;registro,pagina:integer;cod_usuario:string):TJSONObject;
+ function validaNCM(ncm:string;conexao:TFDConnection):Boolean;
+ function validaCFOP(cfop:string;conexao:TFDConnection):Boolean;
+
+
+implementation
+uses funcoes;
+
+
+ {CADASTRO DE PRODUTO}
+ function cadastra_produto(dados:parametros.produto;cod_usuario:string):TJSONObject;
+  var
+   query              : TFDQuery;
+   conexao            : TFDConnection;
+   codigo             : string;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+     codigo := funcoes.trigger;
+
+        try
+           conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+
+
+           if verificaExiste(dados.infProduto.codigoInterno,dados.infProduto.codigoBarras,cod_usuario,conexao) = false then
+              begin
+                   codigoHttp     := 409;
+                   tituloMensagem := 'não foi possivel cadastrar';
+                   mensagem       := 'O produto já existe';
+
+                   json := '{ '+
+                           '  "mensagemRetorno": {  '+
+                           '   "titulo": "'+ tituloMensagem  +'", '+
+                           '   "mensagem": "'+ mensagem  +'" '+
+                           ' }, '+
+                           ' "dadosRetorno": [], '+
+                           ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                           ' }' ;
+
+                  Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                  freeandnil(query);
+                  FreeAndNil(conexao);
+                  Exit;
+              end;
+
+
+           {
+           if validaNCM(dados.infProduto.ncm,conexao) = false then
+              begin
+                   codigoHttp     := 400;
+                   tituloMensagem := 'não foi possivel cadastrar';
+                   mensagem       := 'O NCM é inválido';
+
+                   json := '{ '+
+                           '  "mensagemRetorno": {  '+
+                           '   "titulo": "'+ tituloMensagem  +'", '+
+                           '   "mensagem": "'+ mensagem  +'" '+
+                           ' }//, '+
+                          // ' "dadosRetorno": [], '+
+                         //  ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                         //  ' }' ;
+
+             //     Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+              //    freeandnil(query);
+               //   FreeAndNil(conexao);
+                //  Exit;
+            //  end;
+
+
+           {
+           if validaCFOP(IntToStr(dados.infProduto.cfopInterno),conexao) = false then
+              begin
+                   codigoHttp     := 400;
+                   tituloMensagem := 'não foi possivel cadastra';
+                   mensagem       := 'O CFOP interno é inválido';
+
+                   json := '{ '+
+                           '  "mensagemRetorno": {  '+
+                           '   "titulo": "'+ tituloMensagem  +'", '+
+                           '   "mensagem": "'+ mensagem  +'" '+
+                       //    ' }//, '+
+                        //   ' "dadosRetorno": [], '+
+                         //  ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                         //  ' }' ;
+
+               //   Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+               //   freeandnil(query);
+              //    FreeAndNil(conexao);
+              //    Exit;
+             // end;
+
+         {  if validaCFOP(IntToStr(dados.infProduto.cfopExterno),conexao) = false then
+              begin
+                   codigoHttp     := 400;
+                   tituloMensagem := 'não foi possivel cadastrar';
+                   mensagem       := 'O CFOP externo é inválido';
+
+                   json := '{ '+
+                           '  "mensagemRetorno": {  '+
+                           '   "titulo": "'+ tituloMensagem  +'", '+
+                           '   "mensagem": "'+ mensagem  +'" '+
+                        // ' }//, '+
+               //            ' "dadosRetorno": [], '+
+                //           ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                 //          ' }' ;
+
+                 // Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                 // freeandnil(query);
+                //  FreeAndNil(conexao);
+                //  Exit;
+            //  end;
+
+
+
+
+         query.SQL.Add
+         ('INSERT INTO produtos (codigointerno,'+
+                                 'codigobarras,'+
+                                 'descricao,'+
+                                 'ncm,'+
+                                 'cest,'+
+                                 'preco,'+
+                                 'peso,'+
+                                 'nomeperfiltributario,'+
+                                 'codigoperfiltributario,'+
+                                 'medida,'+
+                                 'ibptMunicipal,'+
+                                 'ibptEstadual,'+
+                                 'ibptFederal,'+
+                                 'hora_cadastro,'+
+                                 'data_cadastro,'+
+
+
+                                 'origem,'+
+                                 'observacoes,'+
+
+                                 'cfopinterno,'+
+                                 'cfopexterno,'+
+
+                                 'cod_produto,'+
+
+                                 'descricaoanp,'+
+                                 'codigoanp,'+
+
+
+                                 'cod_usuario)values(');
+         query.SQL.Add(''''  +funcoes.RemoveAcento(dados.infProduto.codigoInterno)+'''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.infProduto.codigoBarras)+'''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.infProduto.descricao)+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.infProduto.ncm)+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.infProduto.cest)+ '''');
+         query.SQL.Add(',''' +CurrToStr(dados.infProduto.preco)+ '''');
+         query.SQL.Add(',''' +CurrToStr(dados.infProduto.peso)+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.tributos.nomePerfil)+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.tributos.codigo)+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.infProduto.medida)+ '''');
+         query.SQL.Add(',''' +CurrToStr(dados.infProduto.ibptMunicipal)+ '''');
+         query.SQL.Add(',''' +CurrToStr(dados.infProduto.ibptEstadual)+ '''');
+         query.SQL.Add(',''' +CurrToStr(dados.infProduto.ibptFederal)+ '''');
+         query.SQL.Add(',''' +timetostr(now)+'''');
+         query.SQL.Add(',''' +funcoes.formataData(DateToStr(now))+'''');
+
+         query.SQL.Add(',''' +IntToStr(dados.infProduto.codigoOrigem)+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.infProduto.observacoes)+ '''');
+
+         query.SQL.Add(',''' +IntToStr(dados.infProduto.cfopInterno)+ '''');
+         query.SQL.Add(',''' +IntToStr(dados.infProduto.cfopExterno)+ '''');
+
+         query.SQL.Add(',''' +codigo+ '''');
+
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.infProduto.descricaoAnp)+'''');
+         query.SQL.Add(',''' +funcoes.somenteNumeros(dados.infProduto.codigoAnp)+'''');
+
+         query.SQL.Add(',''' +cod_usuario+ ''')');
+         query.ExecSQL;
+
+         if query.RowsAffected = 1 then
+           begin
+            tituloMensagem := 'Produto cadastrado';
+            mensagem       := codigo;
+            codigoHttp     :=  201;
+           end;
+
+           except
+            on E: Exception do
+             begin
+                tituloMensagem := 'Erro interno';
+                mensagem       :=  funcoes.RemoveAcento(e.Message);
+                codigoHttp     :=  500;
+                funcoes.logErro(e.Message);
+             end;
+        end;
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": [], '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+    Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+    freeandnil(query);
+    FreeAndNil(conexao);
+  end;
+
+ {REMOVER PRODUTO}
+ function remove_produto(codigo:string;cod_usuario:String):TJSONObject;
+   var
+   query              : TFDQuery;
+   conexao            : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+        try
+         conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+         query.SQL.Add('DELETE FROM PRODUTOS WHERE cod_produto = '''+codigo+''' and cod_usuario = '''+cod_usuario+'''');
+         query.ExecSQL;
+
+          if query.RowsAffected = 1 then
+                begin
+                   tituloMensagem := 'Tudo certo';
+                   mensagem       := 'Produto removido com sucesso';
+                   codigoHttp     := 200;
+                end else
+                     begin
+                      tituloMensagem := 'não foi possivel remover o produto';
+                      mensagem       := 'o produto não existe';
+                      codigoHttp     := 404;
+                     end;
+           except
+            on E: Exception do
+             begin
+              tituloMensagem := 'Erro interno';
+              mensagem       :=  funcoes.RemoveAcento(e.Message);
+              codigoHttp     := 500;
+             end;
+        end;
+
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": [], '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+    Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+    freeandnil(query);
+    FreeAndNil(conexao);
+  end;
+
+ {ALTERAR PRODUTO}
+ function alterar_produto(codigo_produto:string;dados:parametros.produto;cod_usuario:string):TJSONObject;
+   var
+   query: TFDQuery;
+   conexao : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+
+        try
+          conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+
+
+           if verificaExisteUPDATE(dados.infProduto.codigoInterno,dados.infProduto.codigoBarras,codigo_produto,cod_usuario,conexao) = false then
+              begin
+                   codigoHttp     := 409;
+                   tituloMensagem := 'não foi possivel cadastrar';
+                   mensagem       := 'O produto já existe';
+
+                   json := '{ '+
+                           '  "mensagemRetorno": {  '+
+                           '   "titulo": "'+ tituloMensagem  +'", '+
+                           '   "mensagem": "'+ mensagem  +'" '+
+                           ' }, '+
+                           ' "dadosRetorno": [], '+
+                           ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                           ' }' ;
+
+                  Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                  freeandnil(query);
+                  FreeAndNil(conexao);
+                  Exit;
+              end;
+
+
+           query.SQL.Add('UPDATE PRODUTOS SET codigointerno= ''' + funcoes.RemoveAcento(dados.infProduto.codigoInterno)+ '''');
+           query.SQL.Add(',codigobarras= ''' + funcoes.RemoveAcento(dados.infProduto.codigoBarras)+ '''');
+           query.SQL.Add(',descricao= ''' + funcoes.RemoveAcento(dados.infProduto.descricao) + '''');
+           query.SQL.Add(',preco= ''' +CurrToStr(dados.infProduto.preco)+'''');
+           query.SQL.Add(',peso= ''' +CurrToStr(dados.infProduto.peso)+ '''');
+           query.SQL.Add(',medida= ''' + funcoes.RemoveAcento(dados.infProduto.medida) + '''');
+           query.SQL.Add(',ibptMunicipal= ''' +  CurrToStr(dados.infProduto.ibptMunicipal) + '''');
+           query.SQL.Add(',ibptEstadual= ''' + CurrToStr(dados.infProduto.ibptEstadual) + '''');
+           query.SQL.Add(',ibptFederal= ''' + CurrToStr(dados.infProduto.ibptFederal) + '''');
+           query.SQL.Add(',ncm= ''' + funcoes.RemoveAcento(dados.infProduto.ncm) + '''');
+           query.SQL.Add(',cest= ''' + funcoes.RemoveAcento(dados.infProduto.cest) + '''');
+           query.SQL.Add(',nomeperfiltributario= ''' + funcoes.RemoveAcento(dados.tributos.nomePerfil) + '''');
+           query.SQL.Add(',codigoperfiltributario= ''' +funcoes.RemoveAcento(dados.tributos.codigo)+ '''');
+
+           query.SQL.Add(',cfopinterno= ''' +IntToStr(dados.infProduto.cfopinterno)+ '''');
+           query.SQL.Add(',cfopexterno= ''' +IntToStr(dados.infProduto.cfopexterno)+ '''');
+           query.SQL.Add(',origem= ''' +IntToStr(dados.infProduto.codigoOrigem)+ '''');
+
+           query.SQL.Add(',descricaoanp= ''' +funcoes.RemoveAcento(dados.infProduto.descricaoAnp)+ '''');
+           query.SQL.Add(',codigoanp= ''' +funcoes.somenteNumeros(dados.infProduto.codigoAnp)+ '''');
+
+           query.SQL.Add(',observacoes= ''' +funcoes.RemoveAcento(dados.infProduto.observacoes)+ '''');
+
+           query.SQL.Add('WHERE cod_produto = '''+codigo_produto +''' AND cod_usuario = '''+cod_usuario+'''');
+           query.ExecSQL;
+
+            if query.RowsAffected = 1 then
+                begin
+                   codigoHttp     := 200;
+                   tituloMensagem := 'Tudo certo';
+                   mensagem       := 'produto atualizado';
+                end else
+                     begin
+                      codigoHttp     := 404;
+                      tituloMensagem := 'Não foi possivel atualizar';
+                      mensagem       := 'o produto não existe';
+                     end;
+           except
+            on E: Exception do
+             begin
+              codigoHttp     := 500;
+              tituloMensagem := 'Erro interno';
+              mensagem       :=  funcoes.RemoveAcento(e.Message);
+              funcoes.logErro(e.Message);
+             end;
+        end;
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": [], '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+    Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+    freeandnil(query);
+    FreeAndNil(conexao);
+  end;
+
+ {VERIFICA SE O PRODUTO JÁ ESXITE}
+ function verificaExisteUPDATE(codigointerno:string;ean:string;codigoProduto:string;codigoCliente:string;conexao:TFDConnection):Boolean;
+    var
+     query: TFDQuery;
+     sql :string;
+  begin
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+
+    if (ean = '') AND (codigoInterno = '') then
+          begin
+            Result := True;
+            Exit;
+          end;
+
+    if (ean = '') AND (codigoInterno <> '') then
+          begin
+            sql := 'SELECT count(*) FROM produtos WHERE cod_produto <> '''+codigoProduto+''' AND codigointerno = '''+codigointerno+''' AND  cod_usuario = ''' +codigoCliente+'''';
+          end;
+
+    if (ean <> '') AND (codigoInterno = '') then
+          begin
+            sql := 'SELECT count(*) FROM produtos WHERE cod_produto <> '''+codigoProduto+'''  AND codigobarras = '''+ean+''' AND cod_usuario = ''' +codigoCliente+'''';
+          end;
+
+    if (ean <> '') AND (codigoInterno <> '') then
+          begin
+            sql := 'SELECT count(*) FROM produtos WHERE cod_produto <> '''+codigoProduto+'''  AND codigointerno = '''+codigointerno+''' OR codigobarras = '''+ean+'''  AND  cod_produto <> '''+codigoProduto+''' AND cod_usuario = ''' +codigoCliente+'''';
+          end;
+
+
+        try
+         query.Close;
+         query.SQL.Text := SQL;
+         query.Open;
+
+         if query.FieldByName('count').AsInteger  >= 1 then
+            begin
+              Result := False;
+            end else
+                  begin
+                    Result := True;
+                  end;
+           except
+            on E: Exception do
+             begin
+              Result := False;
+             end;
+        end;
+      freeandnil(query);
+  end;
+
+ {VERIFICA SE O PRODUTO EXISTE NO CADASTRO}
+ function verificaExiste(codigoInterno,ean,codigoCliente:string;conexao:TFDConnection):Boolean;
+  var
+   query: TFDQuery;
+   interno,barras:string;
+  begin
+
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+
+
+    if (ean = '') AND (codigoInterno = '') then
+          begin
+            Result := True;
+            Exit;
+          end;
+
+
+    if codigoInterno = '' then
+       begin
+         interno :=  'WHERE codigobarras = '''+ean+'''';
+       end else
+             begin
+               interno := ' where codigointerno = '''+codigoInterno+'''';
+             end;
+
+    if ean = '' then
+       begin
+
+       end else
+            begin
+              barras := 'OR codigobarras = '''+ean+'''';
+            end;
+
+
+        try
+         query.Close;
+         query.SQL.Add('SELECT count(*) FROM produtos '+interno+' '+barras+' AND cod_usuario = '''+codigoCliente+'''');
+         query.Open;
+
+         if query.FieldByName('COUNT').AsInteger >= 1  then
+            begin
+              Result := False;
+            end else
+                  begin
+                    Result := True;
+                  end;
+
+           except
+            on E: Exception do
+             begin
+              Result := False;
+             end;
+        end;
+
+      freeandnil(query);
+  END;
+
+ {CONSULTA PRODUTO}
+ function buscar_produto(nome,codigo:string;registro,pagina:integer;cod_usuario:string):TJSONObject;
+  var
+   query       : TFDQuery;
+   LJSONArray  : TJSONArray;
+   codigoif    : string;
+   conexao     : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   dados              : string;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+
+        try
+           conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+           query.Close;
+           query.SQL.Add(' SELECT '+
+                          'codigointerno,'+
+                          'codigobarras,'+
+                          'descricao,'+
+                          'preco,'+
+                          'peso,'+
+                          'medida,'+
+                          'ncm,'+
+                          'cest,'+
+                          'nomeperfiltributario,'+
+                          'codigoperfiltributario,'+
+                          'ibptMunicipal,'+
+                          'ibptEstadual,'+
+                          'ibptFederal,'+
+                          'cfopinterno,'+
+                          'cfopexterno,'+
+                          'origem,'+
+                          'descricaoanp,'+
+                          'codigoanp,'+
+                          'cod_produto,'+
+                          'observacoes,'+
+                          'perfil_tributario.COD_ICMS_CST,perfil_tributario.COD_MOD_BC,perfil_tributario.COD_CSON_CST,'+
+                          'perfil_tributario.COD_CST_COFINS,perfil_tributario.COD_TRIB_PIS,perfil_tributario.COD_IPI_CST,'+
+                          'perfil_tributario.PERC_ICMS,'+
+                          'perfil_tributario.PERC_PIS,'+
+                          'perfil_tributario.PERC_COFINS '+
+                          'FROM produtos left outer join perfil_tributario ON produtos.codigoperfiltributario = perfil_tributario.cod_perfil '+
+                          ' where produtos.descricao like ''%'+nome+'%'' AND produtos.cod_produto like ''%'+codigo+'%'' AND produtos.cod_usuario='''+cod_usuario+''' ORDER BY produtos.descricao ASC  LIMIT '+IntToStr(registro)+' OFFSET('+IntToStr(pagina)+' - 1) * '+IntToStr(registro)+' ');
+           query.Open;
+
+           if query.RowsAffected = 0 then
+              begin
+               codigoHttp      := 404;
+               tituloMensagem  := 'nenhum encontrado';
+               mensagem        := 'Nenhum produto encontrado';
+              end else
+                   begin
+                          codigoHttp := 200;
+                          LJSONArray            := query.ToJSONArray;
+                          dados := '"produtos":'+ LJSONArray.Format;
+                          LJSONArray.Free;
+                   end;
+           except
+            on E: Exception do
+             begin
+               codigoHttp      := 500;
+               tituloMensagem  := 'Erro interno';
+               mensagem        := funcoes.RemoveAcento(e.Message);
+               funcoes.logErro(e.Message);
+             end;
+        end;
+
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": { '+ dados +'}, '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+ {VALIDAR NCM}
+ function validaNCM(ncm:string;conexao:TFDConnection):Boolean;
+  var
+   query       : TFDQuery;
+   LJSONArray  : TJSONArray;
+   codigoif    : string;
+  begin
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+     try
+         query.Close;
+         query.SQL.Add('SELECT ncm from ncm where ncm = '''+ncm+''' ');
+         query.Open;
+         if query.RowsAffected = 1 then
+            begin
+              Result := True;
+            end else
+                 begin
+                   Result := False;
+                 end;
+     finally
+
+     end;
+  end;
+
+ {VALIDA CFOP}
+ function validaCFOP(cfop:string;conexao:TFDConnection):Boolean;
+  var
+   query       : TFDQuery;
+   LJSONArray  : TJSONArray;
+   codigoif    : string;
+  begin
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+     try
+         query.Close;
+         query.SQL.Add('SELECT cfop from cfop where cfop = '''+cfop+''' ');
+         query.Open;
+         if query.RowsAffected = 1 then
+            begin
+              Result := True;
+            end else
+                 begin
+                   Result := False;
+                 end;
+      finally
+     end;
+     FreeAndNil(query);
+  end;
+
+
+
+
+
+
+
+
+
+
+
+end.

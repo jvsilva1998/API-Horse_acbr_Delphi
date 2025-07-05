@@ -1,0 +1,128 @@
+unit TransportadoraService;
+
+interface
+
+uses
+  XData.Server.Module,
+  XData.Service.Common,
+  parametros,
+  Json,
+  funcoes,
+  transportadora;
+
+type
+  [ServiceContract]
+  Itransportadoras= interface(IInvokable)
+    ['{04FB9CCB-F5E2-477C-9AD3-639CCB8D5592}']
+    [httppost]function   cadastrar(dados:parametros.transportadoras):TJSONObject;
+    [httpdelete]function remover([FromPath]  codigo:string):Boolean;
+    [httpput]function    alterar([FromPath]  codigo:string;dados:parametros.transportadoras):Boolean;
+    [httpget]function    buscar([FromPath] descricao, [FromPath] cpfCnpj:string; [FromPath] codigo:string):TJSONObject;
+  end;
+
+  [ServiceImplementation]
+  TItransportadoras = class(TInterfacedObject, Itransportadoras)
+  private
+     function cadastrar(dados:parametros.transportadoras):TJSONObject;
+     function remover(codigo:string):Boolean;
+     function alterar(codigo:string; dados:parametros.transportadoras):Boolean;
+     function buscar(descricao,cpfCnpj,codigo:string):TJSONObject;
+  end;
+
+implementation
+
+
+
+
+{ TItransportadoras }
+
+
+
+{ TItransportadoras }
+
+function TItransportadoras.alterar(codigo: string;
+  dados: parametros.transportadoras): Boolean;
+var
+  resultado :integer;
+ begin
+    if funcoes.verificaTokenlogado(TXDataOperationContext.Current.Request.Headers.Get('Authorization')) = true then
+      begin
+            resultado := transportadora.alterar_transportadora(codigo,dados);
+        if  resultado = 200 then
+              begin
+               Result := True;
+              end else
+                    begin
+                       Result   := False;
+                    end;
+            funcoes.statusHTTP(resultado);
+      end else
+           begin
+             Result := False;
+           end;
+ end;
+
+function TItransportadoras.buscar(descricao, cpfCnpj,
+  codigo: string): TJSONObject;
+ var
+  resultado :integer;
+ begin
+    if funcoes.verificaTokenlogado(TXDataOperationContext.Current.Request.Headers.Get('Authorization')) = true then
+      begin
+            resultado := transportadora.buscar_transportadora(descricao,cpfCnpj,codigo);
+            result    := TJSonObject.ParseJSONValue(funcoes.ResultadoJson) as TJSonObject;
+            funcoes.statusHTTP(resultado);
+      end else
+           begin
+            result := TJSonObject.ParseJSONValue(funcoes.JsonNegado) as TJSonObject;
+           end;
+ end;
+
+function TItransportadoras.cadastrar(dados: parametros.transportadoras): TJSONObject;
+var
+  resultado :integer;
+ begin
+    if funcoes.verificaTokenlogado(TXDataOperationContext.Current.Request.Headers.Get('Authorization')) = true then
+      begin
+            resultado := transportadora.cadastra_transportadora(dados);
+        if  resultado = 200 then
+              begin
+               Result := True;
+              end else
+                    begin
+                       Result   := False;
+                    end;
+            funcoes.statusHTTP(resultado);
+      end else
+           begin
+             Result := False;
+           end;
+ end;
+
+function TItransportadoras.remover(codigo: string): Boolean;
+var
+  resultado :integer;
+ begin
+    if funcoes.verificaTokenlogado(TXDataOperationContext.Current.Request.Headers.Get('Authorization')) = true then
+      begin
+            resultado := transportadora.remover_transportadora(codigo);
+        if  resultado = 200 then
+              begin
+               Result := True;
+              end else
+                    begin
+                       Result   := False;
+                    end;
+            funcoes.statusHTTP(resultado);
+      end else
+           begin
+             Result := False;
+           end;
+ end;
+
+initialization
+  RegisterServiceType(TypeInfo(Itransportadoras));
+  RegisterServiceType(TItransportadoras);
+
+end.
+

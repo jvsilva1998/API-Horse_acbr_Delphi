@@ -1,0 +1,93 @@
+unit dm_data;
+
+interface
+
+uses
+  System.SysUtils, System.Classes, FireDAC.Stan.Intf, FireDAC.Stan.Option,
+  FireDAC.Stan.Error, FireDAC.UI.Intf, FireDAC.Phys.Intf, FireDAC.Stan.Def,
+  FireDAC.Stan.Pool, FireDAC.Stan.Async, FireDAC.Phys, FireDAC.VCLUI.Wait,
+  Data.DB, ECripto, FireDAC.Comp.Client, FireDAC.Phys.PG, FireDAC.Phys.PGDef,FireDAC.DApt,
+  FireDAC.Stan.Param, FireDAC.DatS, FireDAC.DApt.Intf, Datasnap.Provider,
+  Datasnap.DBClient, FireDAC.Comp.DataSet, FireDAC.Phys.SQLite,
+  FireDAC.Phys.SQLiteDef, FireDAC.Stan.ExprFuncs, ACBrBase, ACBrDFe, ACBrNFe,Dialogs;
+
+type
+  Tdm_dados = class(TDataModule)
+    conLogError: TFDConnection;
+    conCalll: TFDConnection;
+    certificado: TACBrNFe;
+    conexao: TFDConnection;
+    procedure conexaoError(ASender, AInitiator: TObject;
+      var AException: Exception);
+    procedure DataModuleCreate(Sender: TObject);
+  private
+    { Private declarations }
+  public
+   procedure abreConexao;
+
+
+
+  end;
+
+var
+  dm_dados: Tdm_dados;
+
+implementation
+ uses
+  funcoes;
+
+{%CLASSGROUP 'Vcl.Controls.TControl'}
+
+{$R *.dfm}
+
+{ Tdm_dados }
+
+
+ {ANTES DE SE CONECTAR}
+procedure Tdm_dados.abreConexao;
+ begin
+     with conexao.Params do
+        begin
+          Clear;
+          Add('DriverID='+funcoes.dbDriver);
+          Add('Database='+funcoes.dbNome);
+          Add('User_Name='+funcoes.dbUser);
+          Add('Password='+funcoes.dbSenha);
+          Add('Port='+funcoes.dbPorta);
+          Add('Server='+funcoes.dbHost);
+        end;
+
+         try
+          conexao.Connected := True;
+           except
+            conexao.Connected := False;
+         end;
+ end;
+
+procedure Tdm_dados.conexaoError(ASender, AInitiator: TObject;
+  var AException: Exception);
+begin
+ ShowMessage(AException.Message);
+end;
+
+procedure Tdm_dados.DataModuleCreate(Sender: TObject);
+ begin
+     with conexao.Params do
+        begin
+          Clear;
+          Add('DriverID='+funcoes.dbDriver);
+          Add('Database='+funcoes.dbNome);
+          Add('User_Name='+funcoes.dbUser);
+          Add('Password='+funcoes.dbSenha);
+          Add('Port='+funcoes.dbPorta);
+          Add('Server='+funcoes.dbHost);
+        end;
+
+         try
+          conexao.Connected := True;
+           except
+            conexao.Connected := False;
+         end;
+ end;
+
+end.

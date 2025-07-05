@@ -1,0 +1,44 @@
+unit financeiroService;
+
+interface
+
+uses
+  XData.Server.Module,
+  XData.Service.Common,
+  parametros_cadastros,
+  funcoes;
+
+type
+  [ServiceContract]
+  Ifinanceiros= interface(IInvokable)
+    ['{04FB9CCB-F5E2-477C-9AD3-639CCB8D5592}']
+    [HttpGet] function Sum(A, B: double): double;
+    // By default, any service operation responds to (is invoked by) a POST request from the client.
+    function EchoString(Value: string): string;
+  end;
+
+  [ServiceImplementation]
+  TIfinanceiros = class(TInterfacedObject, Ifinanceiros)
+  private
+    function Sum(A, B: double): double;
+    function EchoString(Value: string): string;
+  end;
+
+implementation
+
+function TIfinanceiros.Sum(A, B: double): double;
+begin
+  Result := A + B;
+end;
+
+function TIfinanceiros.EchoString(Value: string): string;
+begin
+  Result :=  funcoes.geraToken;
+end;
+
+initialization
+  RegisterServiceType(TypeInfo(Ifinanceiros));
+  RegisterServiceType(TIfinanceiros);
+
+end.
+

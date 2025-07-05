@@ -1,0 +1,470 @@
+unit usuariosService;
+
+interface
+
+uses
+  XData.Server.Module,
+  XData.Service.Common,
+  parametros,
+  usuario,
+  System.JSON,
+  funcoes,
+  dialogs,
+
+  System.Classes,
+  EncdDecd,
+  System.SysUtils;
+type
+  [ServiceContract]
+  Iusuarios = interface(IInvokable)
+    ['{04FB9CCB-F5E2-477C-9AD3-639CCB8D5592}']
+    [httppost] function  cadastrar(dados:parametros.usuarioCadastro):TJSONObject;
+    [httppost] function  login(email,senha:string):TJSONObject;
+
+    [Route('token/login/')][httppost] function  loginToken:TJSONObject;
+    [httpput]  function  empresa(dados:parametros.alteraEmpresa):TJSONObject;
+    [httpput]  function  contador(emailContador:string;cnpjContador:string;nomeContador:string;telefoneContador:string):TJSONObject;
+    [Route('logo/novo/')] [httppost] function  logo(base64:string):TJSONObject;
+    [Route('logo/remover/')] [httpdelete] function  removerLogo:TJSONObject;
+    [Route('certificado/novo/')] [httppost] function  certificado(base64,senha:string):TJSONObject;
+    [Route('certificado/remover/')] [httpdelete] function remove_certificado:TJSONObject;
+    [httppost] function  verifica(email,cnpj:string):TJSONObject;
+    [httpput]  function  senha(senhaAntiga,novaSenha:string):TJSONObject;
+    [httpput]  function  nfce(serie,numero,ambiente:int64;csc:string;Idcsc:string;observacoes:string):TJSONObject;
+    [httpput]  function  nfe(serie,numero,ambiente:int64;observacoes:string):TJSONObject;
+    [Route('vendas/cadastrar/')] [httppost] function nova_venda(dados:parametros.venda):TJSONObject;
+    [Route('credito/cadastrar/')] [httppost] function novo_credito(dados:parametros.credito):TJSONObject;
+    [Route('creditos/buscar/')] [httpget] function buscar_creditos(pagina,registros:integer):TJSONObject;
+    [Route('creditos/saldo/')] [httpget] function saldo_creditos:TJSONObject;
+    [Route('cobrancas/limite/')] [httpget] function limite_cobrancas:TJSONObject;
+    [Route('vendas/buscar/')] [httpget] function buscar_vendas(pagina,registros:integer):TJSONObject;
+
+  end;
+
+  [ServiceImplementation]
+  Tusuarios = class(TInterfacedObject, Iusuarios)
+
+  private
+   function  cadastrar(dados:parametros.usuarioCadastro):TJSONObject;
+   function  login(email,senha:string):TJSONObject;
+   function  loginToken:TJSONObject;
+   function  empresa(dados:parametros.alteraEmpresa):TJSONObject;
+   function  contador(emailContador:string;cnpjContador:string;nomeContador:string;telefoneContador:string):TJSONObject;
+   function  certificado(base64,senha:string):TJSONObject;
+   function  logo(base64:string):TJSONObject;
+   function  verifica(email,cnpj:string):TJSONObject;
+   function  remove_certificado:TJSONObject;
+   function  senha(senhaAntiga,novaSenha:string):TJSONObject;
+   function  nova_venda(dados:parametros.venda):TJSONObject;
+   function  buscar_vendas(pagina,registros:integer):TJSONObject;
+   function  nfce(serie,numero,ambiente:int64;csc:string;Idcsc:string;observacoes:string):TJSONObject;
+   function  nfe(serie,numero,ambiente:int64;observacoes:string):TJSONObject;
+   function  removerLogo:TJSONObject;
+   function  novo_credito(dados:parametros.credito):TJSONObject;
+   function  buscar_creditos(pagina,registros:integer):TJSONObject;
+   function  saldo_creditos:TJSONObject;
+   function  limite_cobrancas:TJSONObject;
+  end;
+
+implementation
+{ TUsuarios }
+
+
+
+   {ATUALIZAR CERTIFICADO DIGITAL}
+function Tusuarios.certificado(base64,senha:string): TJSONObject;
+  var
+   resultado      : TJSONObject;
+   usuarios       : TJSONObject;
+ begin
+     usuarios           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuarios.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado  :=  usuario.atualizaCertificado(usuarios.P['mensagemRetorno'].FindValue('mensagem').Value,base64,senha);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(usuarios.P['mensagemRetorno'].ToString) as TJSonObject;
+             funcoes.statusHTTP(strtoint(usuarios.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+
+function Tusuarios.contador(emailContador:string;cnpjContador:string;nomeContador: string;telefoneContador: string): TJSONObject;
+  var
+   resultado      : TJSONObject;
+   usuarios       : TJSONObject;
+ begin
+     usuarios           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuarios.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado  :=  usuario.atualizaContador(usuarios.P['mensagemRetorno'].FindValue('mensagem').Value,emailContador,cnpjContador,nomeContador,telefoneContador);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(usuarios.P['mensagemRetorno'].ToString) as TJSonObject;
+             funcoes.statusHTTP(strtoint(usuarios.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+
+function Tusuarios.empresa(dados: parametros.alteraEmpresa): TJSONObject;
+  var
+   resultado      : TJSONObject;
+   usuarios       : TJSONObject;
+ begin
+     usuarios           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuarios.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado  :=  usuario.alteraEmpresa (dados,usuarios.P['mensagemRetorno'].FindValue('mensagem').Value);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(usuarios.P['mensagemRetorno'].ToString) as TJSonObject;
+             funcoes.statusHTTP(strtoint(usuarios.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+
+
+function Tusuarios.limite_cobrancas: TJSONObject;
+ var
+   usuarios    : TJSONObject;
+   resultado  : TJSONObject;
+ begin
+     usuarios           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuarios.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado := usuario.limiteCobranca(usuarios.P['mensagemRetorno'].FindValue('mensagem').Value);
+            if resultado.FindValue('codigoHttp').Value = '200' then
+               begin
+                result      := TJSonObject.ParseJSONValue(resultado.P['dadosRetorno'].ToString) as TJSonObject;
+               end else
+                   begin
+                    result  :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+                   end;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').Value));
+      end else
+           begin
+            result := TJSonObject.ParseJSONValue(usuarios.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(usuarios.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+
+ {LOGIN}
+function TUsuarios.login(email, senha: string):TJSONObject;
+  var
+   resultado      : TJSONObject;
+   usuarioADM     : TJSONObject;
+ begin
+   usuarioADM    := verificaTokenADM(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+
+    if usuarioADM.FindValue('codigoHttp').Value = '200' then
+      begin
+            resultado  :=  usuario.logar(email,senha);
+            if resultado.FindValue('codigoHttp').Value = '200' then
+               begin
+                result      := TJSonObject.ParseJSONValue(resultado.P['dadosRetorno'].ToString) as TJSonObject;
+               end else
+                   begin
+                    result  :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+                   end;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').Value));
+      end else
+           begin
+             funcoes.statusHTTP(strtoint(usuarioADM.FindValue('codigoHttp').Value));
+             result  := TJSonObject.ParseJSONValue(usuarioADM.P['mensagemRetorno'].ToString) as TJSonObject;
+           end;
+ end;
+
+
+ function Tusuarios.loginToken: TJSONObject;
+ var
+  resultado : TJSONObject;
+ begin
+   resultado := usuario.logarTOKEN(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+
+     if resultado.FindValue('codigoHttp').Value = '200' then
+     begin
+      result      := TJSonObject.ParseJSONValue(resultado.P['dadosRetorno'].ToString) as TJSonObject;
+     end else
+         begin
+          result  :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+         end;
+
+         funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').Value));
+ end;
+
+
+{LOGO}
+function Tusuarios.logo(base64: string): TJSONObject;
+  var
+   resultado      : TJSONObject;
+   usuarios        : TJSONObject;
+ begin
+     usuarios           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+
+    if usuarios.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado  :=  usuario.atualizaLogo(usuarios.P['mensagemRetorno'].FindValue('mensagem').Value,base64);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(usuarios.P['mensagemRetorno'].ToString) as TJSonObject;
+             funcoes.statusHTTP(strtoint(usuarios.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+
+{ATUALIZAR CONFIG NFCE}
+function Tusuarios.nfce(serie, numero, ambiente: int64; csc,Idcsc: string;observacoes:string): TJSONObject;
+  var
+   resultado      : TJSONObject;
+   usuarios        : TJSONObject;
+ begin
+     usuarios           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuarios.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado  :=  usuario.atualizaNfce(usuarios.P['mensagemRetorno'].FindValue('mensagem').Value,serie,numero,ambiente,csc,idcsc,observacoes);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(usuarios.P['mensagemRetorno'].ToString) as TJSonObject;
+             funcoes.statusHTTP(strtoint(usuarios.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+function Tusuarios.nfe(serie, numero, ambiente: int64;observacoes:string): TJSONObject;
+  var
+   resultado      : TJSONObject;
+   usuarios        : TJSONObject;
+ begin
+     usuarios           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuarios.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado  :=  usuario.atualizaNfe (usuarios.P['mensagemRetorno'].FindValue('mensagem').Value,serie,numero,ambiente,observacoes);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(usuarios.P['mensagemRetorno'].ToString) as TJSonObject;
+             funcoes.statusHTTP(strtoint(usuarios.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+function Tusuarios.nova_venda(dados: parametros.venda): TJSONObject;
+  var
+   resultado      : TJSONObject;
+   usuarios        : TJSONObject;
+ begin
+     usuarios           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuarios.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado  :=  usuario.novaVenda(usuarios.P['mensagemRetorno'].FindValue('mensagem').Value,dados);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(usuarios.P['mensagemRetorno'].ToString) as TJSonObject;
+             funcoes.statusHTTP(strtoint(usuarios.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+function Tusuarios.novo_credito(dados: parametros.credito): TJSONObject;
+  var
+   resultado      : TJSONObject;
+   usuarios        : TJSONObject;
+ begin
+     usuarios           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuarios.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado  :=  usuario.faturaCredito(usuarios.P['mensagemRetorno'].FindValue('mensagem').Value,dados);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(usuarios.P['mensagemRetorno'].ToString) as TJSonObject;
+             funcoes.statusHTTP(strtoint(usuarios.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+function Tusuarios.removerLogo: TJSONObject;
+  var
+   resultado      : TJSONObject;
+   usuarios        : TJSONObject;
+ begin
+     usuarios           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuarios.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado  :=  usuario.removerLogo(usuarios.P['mensagemRetorno'].FindValue('mensagem').Value);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(usuarios.P['mensagemRetorno'].ToString) as TJSonObject;
+             funcoes.statusHTTP(strtoint(usuarios.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+function Tusuarios.remove_certificado: TJSONObject;
+  var
+   resultado      : TJSONObject;
+   usuarios        : TJSONObject;
+ begin
+     usuarios           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuarios.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado  :=  usuario.removerCertificado(usuarios.P['mensagemRetorno'].FindValue('mensagem').Value);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(usuarios.P['mensagemRetorno'].ToString) as TJSonObject;
+             funcoes.statusHTTP(strtoint(usuarios.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+function Tusuarios.saldo_creditos: TJSONObject;
+ var
+   usuarios    : TJSONObject;
+   resultado  : TJSONObject;
+ begin
+     usuarios           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuarios.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado := usuario.saldoCreditos(usuarios.P['mensagemRetorno'].FindValue('mensagem').Value);
+            if resultado.FindValue('codigoHttp').Value = '200' then
+               begin
+                result      := TJSonObject.ParseJSONValue(resultado.P['dadosRetorno'].ToString) as TJSonObject;
+               end else
+                   begin
+                    result  :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+                   end;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').Value));
+      end else
+           begin
+            result := TJSonObject.ParseJSONValue(usuarios.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(usuarios.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+function Tusuarios.senha(senhaAntiga, novaSenha: string): TJSONObject;
+  var
+   resultado      : TJSONObject;
+   usuarios        : TJSONObject;
+ begin
+     usuarios           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuarios.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado  :=  usuario.alteraSenha (senhaAntiga,novaSenha,usuarios.P['mensagemRetorno'].FindValue('mensagem').Value);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(usuarios.P['mensagemRetorno'].ToString) as TJSonObject;
+             funcoes.statusHTTP(strtoint(usuarios.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+function Tusuarios.verifica(email, cnpj: string): TJSONObject;
+ var
+  resultado  : TJSonObject;
+  usuarioADM     : TJSONObject;
+ begin
+   usuarioADM    := verificaTokenADM(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+
+  if usuarioADM.FindValue('codigoHttp').Value = '200' then
+     begin
+         resultado  :=  usuario.verificaExistenciaAPI (email,cnpj);
+         result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+         funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+     end
+     else
+      begin
+        funcoes.statusHTTP(strtoint(usuarioADM.FindValue('codigoHttp').Value));
+        result  := TJSonObject.ParseJSONValue(usuarioADM.P['mensagemRetorno'].ToString) as TJSonObject;
+      end;
+ end;
+
+
+function Tusuarios.buscar_creditos(pagina, registros: integer): TJSONObject;
+ var
+   login     : TJSONObject;
+   resultado : TJSONObject;
+ begin
+     login           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if login.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado := usuario.historicoCreditos(login.P['mensagemRetorno'].FindValue('mensagem').Value,pagina,registros);
+            if resultado.FindValue('codigoHttp').Value = '200' then
+               begin
+                result      := TJSonObject.ParseJSONValue(resultado.P['dadosRetorno'].ToString) as TJSonObject;
+               end else
+                   begin
+                    result  :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+                   end;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').Value));
+      end else
+           begin
+            result := TJSonObject.ParseJSONValue(login.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(login.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+
+function Tusuarios.buscar_vendas(pagina, registros: integer): TJSONObject;
+ var
+   login     : TJSONObject;
+   resultado : TJSONObject;
+ begin
+     login           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if login.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado := usuario.historicoVendas (login.P['mensagemRetorno'].FindValue('mensagem').Value,pagina,registros);
+            if resultado.FindValue('codigoHttp').Value = '200' then
+               begin
+                result      := TJSonObject.ParseJSONValue(resultado.P['dadosRetorno'].ToString) as TJSonObject;
+               end else
+                   begin
+                    result  :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+                   end;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').Value));
+      end else
+           begin
+            result := TJSonObject.ParseJSONValue(login.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(login.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+function TUsuarios.cadastrar(dados:parametros.usuarioCadastro): TJSONObject;
+ var
+  token     : string;
+  resultado : TJSonObject;
+   usuarioADM     : TJSONObject;
+ begin
+   usuarioADM    := verificaTokenADM(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+
+  if usuarioADM.FindValue('codigoHttp').Value = '200' then
+     begin
+         resultado  :=   usuario.cadastro_primeiro_user (dados);
+         result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+         funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+     end
+     else
+      begin
+        funcoes.statusHTTP(strtoint(usuarioADM.FindValue('codigoHttp').Value));
+        result  := TJSonObject.ParseJSONValue(usuarioADM.P['mensagemRetorno'].ToString) as TJSonObject;
+      end;
+ end;
+
+initialization
+  RegisterServiceType(TypeInfo(IUsuarios));
+  RegisterServiceType(TUsuarios);
+
+end.

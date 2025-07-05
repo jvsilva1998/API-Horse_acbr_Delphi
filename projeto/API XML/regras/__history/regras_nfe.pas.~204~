@@ -1,0 +1,278 @@
+unit regras_nfe;
+
+interface
+
+uses
+ System.SysUtils,
+ System.Classes,
+ vcl.forms,
+ Vcl.Dialogs,
+ FireDAC.Comp.Client,
+ System.JSON,
+ DataSet.Serialize,
+ parametros,
+ Data.DB,
+ funcoes,
+ Variants,
+ System.Zip,
+ Winapi.Windows;
+
+
+ function emitirXML(dataInicio,dataFim:TDate;tipoNota:integer;codigoUsuario:string): TJSonObject;
+ function consultaXML(codigoUsuario:string;pagina:Integer;registros:Integer): TJSonObject;
+ function removerXML(codigo:string;cod_usuario:string):TJSONObject;
+
+
+ implementation
+
+ function emitirXML(dataInicio,dataFim:TDate;tipoNota:integer;codigoUsuario:string): TJSonObject;
+ var
+   json                  : string;
+   codigoHttp            : integer;
+   mensagem              : string;
+   tituloMensagem        : string;
+   query                 : TFDQuery;
+   conexao               : TFDConnection;
+   codigo                : string;
+   nomeNota              : TStringList;
+  begin
+    codigo               := funcoes.trigger;
+    conexao              := TFDConnection.Create(nil);
+    query                := TFDQuery.Create(nil);
+    query.Connection     := conexao;
+
+
+                   try
+                        conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+                        query.SQL.Clear;
+                        query.Close();
+                        query.SQL.Add ('SELECT COUNT(*) AS TOTAL FROM notas_nfe where tiponota = '''+inttostr(tipoNota)+''' AND  dataenvio BETWEEN '''+FormatDateTime('YYYY-MM-DD',dataInicio)+'''AND '''+FormatDateTime('YYYY-MM-DD',dataFim)+''' and codusuario = '''+codigoUsuario+'''');
+                        query.Open();
+
+                        if query.FieldByName('TOTAL').AsInteger = 0 then
+                           begin
+                             codigoHttp     :=  404;
+                             mensagem       := 'Nenhum resultado';
+                             tituloMensagem := 'Nenhuma NF encontrada';
+
+                             json := '{ '+
+                             '  "mensagemRetorno": {  '+
+                             '   "titulo": "'+ 'Nenhum resultado'+'", '+
+                             '   "mensagem": "Nenhuma NF foi encontrada" '+
+                             ' }, '+
+                             ' "dadosRetorno": [], '+
+                             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                             ' }' ;
+
+                              Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                              freeandnil(query);
+                              FreeAndNil(conexao);
+                              Exit;
+                           end;
+
+
+                       nomeNota := TStringlist.Create;
+                       query.SQL.Clear;
+                       query.Close();
+                       query.SQL.Add ('SELECT xmlnota,chaveacesso FROM notas_nfe where tiponota = '''+inttostr(tipoNota)+''' AND  dataenvio BETWEEN '''+FormatDateTime('YYYY-MM-DD',dataInicio)+'''AND '''+FormatDateTime('YYYY-MM-DD',dataFim)+''' and codusuario = '''+codigoUsuario+'''');
+                       query.Open();
+
+                       ForceDirectories(ExtractFilePath(Application.ExeName)+'\'+codigo);
+
+                       query.First;
+                       while not(query.Eof) do
+                         begin
+                          nomeNota.Clear;
+                          nomeNota.Add(query.FieldByName('xmlnota').AsString);
+                          nomeNota.SaveToFile(ExtractFilePath(Application.ExeName)+'\'+codigo+'\'+query.FieldByName('chaveacesso').AsString+'.xml');
+                          query.Next;
+                         end;
+
+
+                        TZipFile.ZipDirectoryContents('C:\xampp\htdocs\Nova pasta\'+codigo+'.zip', ExtractFilePath(Application.ExeName)+'\'+codigo);
+                       // RecursiveDelete('./xmltemp');
+
+                        query.SQL.Clear;
+                        query.SQL.Add ('INSERT INTO xml_gerados(id,codusuario,dataInicio,dataFim,dataExpira,dataEmissao,tiponota)values(');
+                        query.SQL.Add(''''  +codigo+ '''');
+                        query.SQL.Add(',''' +codigoUsuario+ '''');
+                        query.SQL.Add(',''' +FormatDateTime('YYYY-MM-DD',dataInicio)+ '''');
+                        query.SQL.Add(',''' +FormatDateTime('YYYY-MM-DD',dataFim)+ '''');
+                        query.SQL.Add(',''' +FormatDateTime('YYYY-MM-DD',dataFim+7)+ '''');
+                        query.SQL.Add(',''' +FormatDateTime('YYYY-MM-DD',now)+ '''');
+                        query.SQL.Add(',''' +inttostr(tipoNota)+ ''')');
+                        query.ExecSQL;
+
+                        if query.RowsAffected = 1 then
+                           BEGIN
+                            codigoHttp     :=  201;
+                            mensagem       := 'tud certinho';
+                            tituloMensagem := 'XML gerado com sucesso';
+
+                             json := '{ '+
+                             '  "mensagemRetorno": {  '+
+                             '   "titulo": "'+ 'XML GERADO'  +'", '+
+                             '   "mensagem": "'+codigo+'" '+
+                             ' }, '+
+                             ' "dadosRetorno": [], '+
+                             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                             ' }' ;
+
+                              Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                              freeandnil(query);
+                              FreeAndNil(conexao);
+                              Exit;
+                           END;
+
+
+                          except on E: Exception do
+                              begin
+
+                               tituloMensagem := 'Erro interno';
+                               codigoHttp     :=  500;
+
+                               json := '{ '+
+                               '  "mensagemRetorno": {  '+
+                               '   "titulo": "'+ tituloMensagem  +'", '+
+                               '   "mensagem": "'+ funcoes.RemoveAcento(e.Message)+'" '+
+                               ' }, '+
+                               ' "dadosRetorno": [], '+
+                               ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                               ' }' ;
+
+                                Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                                freeandnil(query);
+                                FreeAndNil(conexao);
+                                Exit;
+                              end;
+                   end;
+
+
+       json := '{ '+
+       '  "mensagemRetorno": {  '+
+       '   "titulo": "'+ tituloMensagem  +'", '+
+       '   "mensagem": "'+ mensagem  +'" '+
+       ' }, '+
+       ' "dadosRetorno": [], '+
+       ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+       ' }' ;
+
+       Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+       freeandnil(query);
+       FreeAndNil(conexao);
+  end;
+
+ function consultaXML(codigoUsuario:string;pagina:Integer;registros:Integer): TJSonObject;
+   var
+   query              : TFDQuery;
+   LJSONArray         : TJSONArray;
+   codigoif           : string;
+   conexao            : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   dados              : string;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+        try
+           conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+           query.Close;
+           query.SQL.Add('select id,dataInicio,dataFim,dataExpira,dataEmissao,tiponota from xml_gerados where codusuario = '''+codigoUsuario+''' ORDER BY dataEmissao ASC LIMIT '+IntToStr(registros)+' OFFSET '+IntToStr((pagina-1) * registros)+' ');
+           query.Open;
+
+           if query.RowsAffected = 0 then
+              begin
+               codigoHttp      := 404;
+               tituloMensagem  := 'nenhum encontrado';
+               mensagem        := 'Nenhum xml encontrado';
+              end else
+                   begin
+                          codigoHttp  := 200;
+                          LJSONArray  := query.ToJSONArray;
+                          dados       := '"xml":'+ LJSONArray.Format;
+                          LJSONArray.Free;
+                   end;
+           except
+            on E: Exception do
+             begin
+               codigoHttp      := 500;
+               tituloMensagem  := 'Erro interno';
+               mensagem        := funcoes.RemoveAcento(e.Message);
+               funcoes.logErro(e.Message);
+             end;
+        end;
+
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": { '+ dados +'}, '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+ function removerXML(codigo:string;cod_usuario:string):TJSONObject;
+   var
+   query              : TFDQuery;
+   conexao            : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+        try
+         conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+         query.SQL.Add('DELETE FROM xml_gerados WHERE id= '''+codigo+''' and codusuario= '''+cod_usuario+'''');
+         query.ExecSQL;
+         DeleteFile(PChar('C:\xampp\htdocs\Nova pasta\'+codigo+'.zip'));
+
+           if query.RowsAffected = 1 then
+                begin
+                  {desvincular perfil dos produtos}
+                   tituloMensagem := 'Tudo certo';
+                   mensagem       := 'xml removido com sucesso';
+                   codigoHttp     := 200;
+                end else
+                     begin
+                       tituloMensagem := 'não foi possivel remover';
+                       mensagem       := 'o xml não foi encontrado';
+                       codigoHttp     := 404;
+                     end;
+           except
+            on E: Exception do
+             begin
+              tituloMensagem := 'Erro';
+              mensagem       := funcoes.RemoveAcento(e.Message);
+              codigoHttp     := 500;
+              funcoes.logErro(e.Message);
+             end;
+        end;
+       json           := '{ '+
+                   '  "mensagemRetorno": {  '+
+                   '   "titulo": "'+ tituloMensagem  +'", '+
+                   '   "mensagem": "'+ mensagem  +'" '+
+                   ' }, '+
+                   ' "dadosRetorno": [], '+
+                   ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                   ' }' ;
+
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+
+end.
+

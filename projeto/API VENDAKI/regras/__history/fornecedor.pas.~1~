@@ -1,0 +1,210 @@
+unit fornecedor;
+
+interface
+
+uses
+  System.SysUtils,
+  Vcl.Dialogs,
+  FireDAC.Comp.Client,
+  parametros,
+  System.JSON,
+  DataSet.Serialize;
+
+  function cadastra_fornecedor(dados:parametros.fornecedor):integer;
+  function remover_fornecedor(codigo:string):integer;
+  function alterar_fornecedor(codigo:string;dados:parametros.fornecedor):integer;
+  function buscar_fornecedor(cnpj,descricao:string):integer;
+
+implementation
+   uses dm_data, funcoes;
+
+
+   function cadastra_fornecedor(dados:parametros.fornecedor):integer;
+  var
+   query: TFDQuery;
+  begin
+    if dm_dados.verificaConexao = true then
+     begin
+         query             := TFDQuery.Create(nil);
+         query.Connection  := dm_dados.conexao;
+        try
+         query.SQL.Add
+         ('INSERT INTO FORNECEDORES('+
+                                 'cnpj,'+
+                                 'razaoSocial,'+
+                                 'IM,'+
+                                 'IE,'+
+                                 'ramoEmpresa,'+
+                                 'telefone,'+
+                                 'whatsapp,'+
+                                 'email,'+
+                                 'endereco,'+
+                                 'numero,'+
+                                 'complemento,'+
+                                 'referencia,'+
+                                 'bairro,'+
+                                 'cep,'+
+                                 'cidade,'+
+                                 'codigoCidade,'+
+                                 'uf,'+
+                                 'obs,'+
+                                 'cod_fornecedor,'+
+                                 'cod_usuario)values(');
+         query.SQL.Add(''''  +funcoes.RemoveAcento(dados.cnpj) + '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.razaoSocial ) + '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.IM ) + '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.IE )+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.ramoEmpresa )+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.telefone )+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.whatsapp )+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.email )+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.endereco )+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.numero  )+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.complemento  )+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.referencia )+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.bairro )+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.cep )+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.cidade)+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.codigoCidade )+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.uf )+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.obs )+ '''');
+         query.SQL.Add(',''' +funcoes.trigger+ '''');
+         query.SQL.Add(',''' +funcoes.CodUsuarioLogado+ ''')');
+         query.ExecSQL;
+         funcoes.statusHTTP(201);
+         result := 201;
+           except
+            on E: Exception do
+             begin
+              Result := 500;
+              funcoes.logErro(e.Message);
+             end;
+        end;
+     end else
+           begin
+            {erro de conexão com o banco}
+             Result := 500;
+             funcoes.statusHTTP(500);
+           end;
+      freeandnil(query);
+  end;
+
+   function remover_fornecedor(codigo:string):integer;
+   var
+   query: TFDQuery;
+  begin
+    if dm_dados.verificaConexao = true then
+     begin
+         query             := TFDQuery.Create(nil);
+         query.Connection  := dm_dados.conexao;
+        try
+         query.SQL.Add('DELETE FROM FORNECEDORES WHERE cod_fornecedor = '''+codigo+''' and cod_usuario = '''+funcoes.CodUsuarioLogado+'''');
+         query.ExecSQL;
+         result := 200;
+           except
+            on E: Exception do
+             begin
+              Result := 500;
+              funcoes.logErro(e.Message);
+             end;
+        end;
+     end else
+           begin
+            {erro de conexão com o banco}
+             Result := 500;
+           end;
+      freeandnil(query);
+  end;
+
+   function alterar_fornecedor(codigo:string;dados:parametros.fornecedor):integer;
+  var
+   query: TFDQuery;
+  begin
+    if dm_dados.verificaConexao = true then
+     begin
+         query             := TFDQuery.Create(nil);
+         query.Connection  := dm_dados.conexao;
+        try
+           query.SQL.Add('UPDATE FORNECEDORES SET cnpj= ''' + funcoes.RemoveAcento(dados.cnpj)+ '''');
+           query.SQL.Add(',razaoSocial= ''' + funcoes.RemoveAcento(dados.razaoSocial)+ '''');
+           query.SQL.Add(',IM= ''' + funcoes.RemoveAcento(dados.IM) + '''');
+           query.SQL.Add(',IE= ''' + funcoes.RemoveAcento(dados.IE) + '''');
+           query.SQL.Add(',ramoEmpresa= ''' + funcoes.RemoveAcento(dados.ramoEmpresa) + '''');
+           query.SQL.Add(',telefone= ''' + funcoes.RemoveAcento(dados.telefone) + '''');
+           query.SQL.Add(',whatsapp= ''' + funcoes.RemoveAcento(dados.whatsapp) + '''');
+           query.SQL.Add(',email= ''' + funcoes.RemoveAcento(dados.email)+ '''');
+           query.SQL.Add(',endereco= ''' + dados.endereco+ '''');
+           query.SQL.Add(',numero= ''' + dados.numero+ '''');
+           query.SQL.Add(',complemento= ''' + funcoes.RemoveAcento(dados.complemento) + '''');
+           query.SQL.Add(',referencia= ''' + dados.referencia + '''');
+           query.SQL.Add(',bairro= ''' + dados.bairro + '''');
+           query.SQL.Add(',cep= ''' + dados.cep + '''');
+           query.SQL.Add(',cidade= ''' + dados.cidade + '''');
+           query.SQL.Add(',codigoCidade = ''' + dados.codigoCidade + '''');
+           query.SQL.Add(',uf= ''' + dados.uf + '''');
+           query.SQL.Add(',obs= '''+dados.obs  + '''');
+           query.SQL.Add('WHERE cod_fornecedor = '''+codigo+''' AND cod_usuario = '''+funcoes.CodUsuarioLogado+'''');
+           query.ExecSQL;
+           funcoes.statusHTTP(200);
+           result := 200;
+           except
+            on E: Exception do
+             begin
+              Result := 500;
+              funcoes.logErro(e.Message);
+             end;
+        end;
+     end else
+           begin
+            {erro de conexão com o banco}
+             Result := 500;
+             funcoes.statusHTTP(500);
+           end;
+      freeandnil(query);
+  end;
+
+   function buscar_fornecedor(cnpj,descricao:string):integer;
+  var
+   query       : TFDQuery;
+   LJSONArray  : TJSONArray;
+  begin
+    if dm_dados.verificaConexao = true then
+     begin
+         query             := TFDQuery.Create(nil);
+         query.Connection  := dm_dados.conexao;
+        try
+           query.Close;
+           query.SQL.Add('SELECT *FROM FORNECEDORES where cnpj like ''%'+cnpj+'%'' AND razaoSocial like ''%'+descricao+'%'' AND cod_usuario='''+funcoes.CodUsuarioLogado+'''');
+           query.Open;
+
+           if query.FieldByName('cod_fornecedor').AsString = '' then
+              begin
+                 result := 204;
+                 funcoes.ResultadoJson := funcoes.JsonNegado;
+              end else
+                   begin
+                      result := 200;
+                      LJSONArray            := query.ToJSONArray;
+                      funcoes.ResultadoJson := '{"fornecedores":'+ LJSONArray.Format+'}';
+                      LJSONArray.Free;
+                   end;
+           except
+            on E: Exception do
+             begin
+              Result := 500;
+              funcoes.logErro(e.Message);
+             end;
+        end;
+     end else
+           begin
+            {erro de conexão com o banco}
+             Result := 500;
+             funcoes.statusHTTP(500);
+           end;
+    freeandnil(query);
+  end;
+
+
+
+
+end.

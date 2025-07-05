@@ -1,0 +1,94 @@
+object Form1: TForm1
+  Left = 0
+  Top = 0
+  BorderStyle = bsDialog
+  Caption = 'API NFE'
+  ClientHeight = 280
+  ClientWidth = 433
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  OldCreateOrder = False
+  PixelsPerInch = 96
+  TextHeight = 13
+  object Panel1: TPanel
+    Left = 0
+    Top = 0
+    Width = 433
+    Height = 73
+    Align = alTop
+    BevelOuter = bvNone
+    Caption = 'Servidor ligado'
+    Color = 16770250
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = 16744448
+    Font.Height = -40
+    Font.Name = 'Tahoma'
+    Font.Style = [fsBold]
+    ParentBackground = False
+    ParentFont = False
+    TabOrder = 0
+  end
+  object Edit1: TEdit
+    Left = 88
+    Top = 208
+    Width = 281
+    Height = 21
+    TabOrder = 1
+    Text = 'http://localhost:2001/api.vendaki/nfe/swaggerUI'
+  end
+  object SparkleHttpSysDispatcher1: TSparkleHttpSysDispatcher
+    Active = True
+    Left = 256
+    Top = 96
+  end
+  object XDataServer1: TXDataServer
+    BaseUrl = 'http://+:2001/api.vendaki/nfe'
+    Dispatcher = SparkleHttpSysDispatcher1
+    EntitySetPermissions = <>
+    SwaggerOptions.Enabled = True
+    SwaggerOptions.AuthMode = Jwt
+    SwaggerUIOptions.Enabled = True
+    SwaggerUIOptions.ShowFilter = True
+    SwaggerUIOptions.DocExpansion = None
+    Left = 96
+    Top = 112
+    object XDataServer1CORS: TSparkleCorsMiddleware
+    end
+  end
+  object FDPhysPgDriverLink1: TFDPhysPgDriverLink
+    Left = 192
+    Top = 152
+  end
+  object ACBrNFeDANFEFR1: TACBrNFeDANFEFR
+    Sistema = 'Projeto ACBr - www.projetoacbr.com.br'
+    MargemInferior = 8.000000000000000000
+    MargemSuperior = 8.000000000000000000
+    MargemEsquerda = 6.000000000000000000
+    MargemDireita = 5.100000000000000000
+    ExpandeLogoMarcaConfig.Altura = 0
+    ExpandeLogoMarcaConfig.Esquerda = 0
+    ExpandeLogoMarcaConfig.Topo = 0
+    ExpandeLogoMarcaConfig.Largura = 0
+    ExpandeLogoMarcaConfig.Dimensionar = False
+    ExpandeLogoMarcaConfig.Esticar = True
+    CasasDecimais.Formato = tdetInteger
+    CasasDecimais.qCom = 2
+    CasasDecimais.vUnCom = 2
+    CasasDecimais.MaskqCom = ',0.00'
+    CasasDecimais.MaskvUnCom = ',0.00'
+    ExibeCampoFatura = False
+    EspessuraBorda = 1
+    BorderIcon = [biSystemMenu, biMinimize, biMaximize]
+    ThreadSafe = False
+    Left = 336
+    Top = 136
+  end
+  object FDPhysMySQLDriverLink1: TFDPhysMySQLDriverLink
+    Left = 336
+    Top = 56
+  end
+end

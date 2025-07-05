@@ -1,0 +1,66 @@
+object Form1: TForm1
+  Left = 0
+  Top = 0
+  BorderStyle = bsDialog
+  Caption = 'API NFCE'
+  ClientHeight = 280
+  ClientWidth = 433
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  OldCreateOrder = False
+  OnCreate = FormCreate
+  PixelsPerInch = 96
+  TextHeight = 13
+  object Panel1: TPanel
+    Left = 0
+    Top = 0
+    Width = 433
+    Height = 73
+    Align = alTop
+    BevelOuter = bvNone
+    Caption = 'Servidor ligado'
+    Color = 16770250
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = 16744448
+    Font.Height = -40
+    Font.Name = 'Tahoma'
+    Font.Style = [fsBold]
+    ParentBackground = False
+    ParentFont = False
+    TabOrder = 0
+  end
+  object Edit1: TEdit
+    Left = 88
+    Top = 208
+    Width = 281
+    Height = 21
+    TabOrder = 1
+    Text = 'http://localhost:2001/nfce/swaggerUI'
+  end
+  object SparkleHttpSysDispatcher1: TSparkleHttpSysDispatcher
+    Left = 208
+    Top = 144
+  end
+  object XDataServer1: TXDataServer
+    BaseUrl = 'http://api.kinotas/nfe'
+    Dispatcher = SparkleHttpSysDispatcher1
+    EntitySetPermissions = <>
+    SwaggerOptions.Enabled = True
+    SwaggerOptions.AuthMode = Jwt
+    SwaggerUIOptions.Enabled = True
+    SwaggerUIOptions.ShowFilter = True
+    SwaggerUIOptions.DocExpansion = None
+    Left = 80
+    Top = 96
+    object XDataServer1CORS: TSparkleCorsMiddleware
+    end
+  end
+  object FDPhysMySQLDriverLink1: TFDPhysMySQLDriverLink
+    Left = 328
+    Top = 96
+  end
+end

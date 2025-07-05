@@ -1,0 +1,476 @@
+unit imposto;
+
+interface
+
+uses
+  System.SysUtils,
+  Vcl.Dialogs,
+  FireDAC.Comp.Client,
+  parametros,
+  System.JSON,
+  DataSet.Serialize,
+  retornos;
+
+  function cadastra_imposto(dados:parametros.PerfilTibutario):integer;
+  function remover_imposto(codigo:string):integer;
+  function alterar_imposto(codigo:string;dados:parametros.PerfilTibutario):integer;
+  function buscar_imposto(descricao:string;pagina,registro:integer):integer;
+  function verificaNome(nome,codigoUsuario:string):boolean;
+  function verificaUPDATENome(nome,codigo_imposto:string):boolean;
+
+
+implementation
+   uses dm_data, funcoes;
+
+
+   {CADASTRO IMPOSTO}
+   function cadastra_imposto(dados:parametros.PerfilTibutario):integer;
+  var
+   query   : TFDQuery;
+   conexao : TFDConnection;
+   codigo  : string;
+
+  begin
+
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+     with conexao.Params do
+        begin
+          Clear;
+          Add('DriverID='+funcoes.dbDriver);
+          Add('Database='+funcoes.dbNome);
+          Add('User_Name='+funcoes.dbUser);
+          Add('Password='+funcoes.dbSenha);
+          Add('Port='+funcoes.dbPorta);
+          Add('Server='+funcoes.dbHost);
+        end;
+
+      try
+       conexao.Connected := True;
+       except
+       conexao.Connected := False;
+      end;
+
+
+    if conexao.Connected = true then
+       begin
+        try
+          if verificaNome(dados.descricao,funcoes.CodUsuarioLogado) = false then
+             begin
+              Result := 409;
+              retornos.preecheRetorno('Não foi possível cadastrar','Já existe um imposto com esse nome',false);
+              Exit;
+             end;
+
+
+         codigo := funcoes.trigger;
+         query.SQL.Add
+         ('INSERT INTO perfil_tributario ( '+
+                                 'NOME_PERFIL,'+
+                                 'COD_ICMS_CST,'+
+                                 'COD_MOD_BC,'+
+                                 'COD_CSON_CST,'+
+                                 'COD_CST_COFINS,'+
+                                 'COD_TRIB_PIS,'+
+                                 'COD_IPI_CST,'+
+                                 'PERC_ICMS,'+
+                                 'PERC_PIS,'+
+                                 'PERC_IPI,'+
+                                 'PERC_COFINS,'+
+                                 'cod_perfil,'+
+                                 'cod_usuario)values(');
+         query.SQL.Add(''''  +funcoes.RemoveAcento(dados.descricao) + '''');
+         query.SQL.Add(',''' +IntToStr(dados.icms.codigoCst)+ '''');
+         query.SQL.Add(',''' +IntToStr(dados.icms.modalidadeBaseCalculo)+ '''');
+         query.SQL.Add(',''' +IntToStr(dados.icms.codigoCsosnCST)+ '''');
+         query.SQL.Add(',''' +IntToStr(dados.cofins.CodigoCst)+ '''');
+         query.SQL.Add(',''' +IntToStr(dados.pis.CodigoTributacao)+ '''');
+         query.SQL.Add(',''' +IntToStr(dados.ipi.CodigoCst)+ '''');
+         query.SQL.Add(',''' +CurrToStr(dados.icms.aliquota)+'''');
+         query.SQL.Add(',''' +CurrToStr(dados.pis.aliquota)+ '''');
+         query.SQL.Add(',''' +CurrToStr(dados.ipi.aliquota)+ '''');
+         query.SQL.Add(',''' +CurrToStr(dados.cofins.aliquota)+ '''');
+         query.SQL.Add(',''' +codigo+ '''');
+         query.SQL.Add(',''' +funcoes.CodUsuarioLogado+ ''')');
+         query.ExecSQL;
+         result := 201;
+         retornos.preecheRetorno('Imposto cadastrado',codigo,true);
+
+           except
+            on E: Exception do
+             begin
+
+              Result := 500;
+              retornos.preecheRetorno('Erro ao inserir perfi de imposto',e.Message,false);
+              funcoes.logErro(e.Message);
+             end;
+        end;
+       end else
+           begin
+            {erro de conexão com o banco}
+             retornos.preecheRetorno('Erro ao inserir perfi de imposto','Erro interno, tente mais tarde',false);
+             Result := 500;
+           end;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+
+   {REMOVER IMPOSTO}
+   function remover_imposto(codigo:string):integer;
+   var
+   query: TFDQuery;
+   conexao : TFDConnection;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+     with conexao.Params do
+        begin
+          Clear;
+          Add('DriverID='+funcoes.dbDriver);
+          Add('Database='+funcoes.dbNome);
+          Add('User_Name='+funcoes.dbUser);
+          Add('Password='+funcoes.dbSenha);
+          Add('Port='+funcoes.dbPorta);
+          Add('Server='+funcoes.dbHost);
+        end;
+
+      try
+       conexao.Connected := True;
+       except
+       conexao.Connected := False;
+      end;
+
+
+    if conexao.Connected = true then
+     begin
+        try
+         query.SQL.Add('DELETE FROM perfil_tributario WHERE cod_perfil = '''+codigo+''' and cod_usuario = '''+funcoes.CodUsuarioLogado+'''');
+         query.ExecSQL;
+
+           if query.RowsAffected = 1 then
+                begin
+                  {desvincular perfil dos produtos}
+                   query.SQL.Clear;
+                   query.SQL.Add('UPDATE produtos SET nomeperfiltributario = '''+''+''' ,codigoperfiltributario = '''+''+''' where codigoperfiltributario = '''+codigo+''' and cod_usuario = '''+funcoes.CodUsuarioLogado+'''');
+                   query.ExecSQL;
+
+                   result := 200;
+                   retornos.preecheRetorno('Tudo certo ','Perfil de imposto removido com sucesso',true);
+                end else
+                     begin
+                       result := 404;
+                       retornos.preecheRetorno('não foi possivel atualizar','o perfil de imposto não existe',false);
+                     end;
+           except
+            on E: Exception do
+             begin
+              Result := 500;
+              funcoes.logErro(e.Message);
+              retornos.preecheRetorno('Erro interto',e.Message,false);
+             end;
+        end;
+     end else
+           begin
+            {erro de conexão com o banco}
+             retornos.preecheRetorno('Erro interno','Tente mais tarde',false);
+             Result := 500;
+           end;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+
+   {ALTERAR IMPOSTO}
+   function alterar_imposto(codigo:string;dados:parametros.PerfilTibutario):integer;
+  var
+   query   : TFDQuery;
+   conexao : TFDConnection;
+  begin
+
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+     with conexao.Params do
+        begin
+          Clear;
+          Add('DriverID='+funcoes.dbDriver);
+          Add('Database='+funcoes.dbNome);
+          Add('User_Name='+funcoes.dbUser);
+          Add('Password='+funcoes.dbSenha);
+          Add('Port='+funcoes.dbPorta);
+          Add('Server='+funcoes.dbHost);
+        end;
+
+      try
+       conexao.Connected := True;
+       except
+       conexao.Connected := False;
+      end;
+
+    if conexao.Connected = true then
+     begin
+        try
+          if verificaUPDATENome(dados.descricao,codigo) = false then
+             begin
+              Result := 409;
+              retornos.preecheRetorno('Não foi possível cadastrar','Já existe um imposto com esse nome',false);
+              Exit;
+             end;
+
+           query.SQL.Add('UPDATE perfil_tributario SET NOME_PERFIL = ''' +funcoes.RemoveAcento(dados.descricao) + '''');
+           query.SQL.Add(',COD_ICMS_CST= '''+IntToStr(dados.icms.codigoCst)+ '''');
+           query.SQL.Add(',COD_MOD_BC= '''+IntToStr(dados.icms.modalidadeBaseCalculo)+ '''');
+           query.SQL.Add(',COD_CSON_CST= ''' +IntToStr(dados.icms.codigoCsosnCST)+ '''');
+           query.SQL.Add(',COD_CST_COFINS= ''' +IntToStr(dados.cofins.CodigoCst)+ '''');
+           query.SQL.Add(',COD_TRIB_PIS= ''' +IntToStr(dados.pis.CodigoTributacao)+ '''');
+           query.SQL.Add(',COD_IPI_CST= ''' +IntToStr(dados.ipi.CodigoCst)+ '''');
+           query.SQL.Add(',PERC_ICMS= ''' +CurrToStr(dados.icms.aliquota)+ '''');
+           query.SQL.Add(',PERC_PIS= ''' +CurrToStr(dados.pis.aliquota)+ '''');
+           query.SQL.Add(',PERC_IPI= ''' +CurrToStr(dados.ipi.aliquota)+ '''');
+           query.SQL.Add(',PERC_COFINS= ''' +CurrToStr(dados.cofins.aliquota)+ '''');
+           query.SQL.Add('WHERE cod_perfil = '''+codigo+''' AND cod_usuario = '''+funcoes.CodUsuarioLogado+'''');
+           query.ExecSQL;
+
+         if query.RowsAffected = 1 then
+                begin
+                   query.SQL.Clear;
+                   query.SQL.Add('UPDATE produtos SET nomeperfiltributario = ''' +funcoes.RemoveAcento(dados.descricao) + ''' where codigoperfiltributario = '''+codigo+''' and cod_usuario = '''+funcoes.CodUsuarioLogado+'''');
+                   query.ExecSQL;
+
+                   result := 200;
+                   retornos.preecheRetorno('Tudo certo ','Perfil de imposto atualizado com sucesso',true);
+                end else
+                     begin
+                       result := 404;
+                       retornos.preecheRetorno('não foi possivel atualizar','o perfil de imposto não existe',false);
+                     end;
+           except
+            on E: Exception do
+             begin
+              Result := 500;
+              retornos.preecheRetorno('Erro interno',e.Message,false);
+              funcoes.logErro(e.Message);
+             end;
+        end;
+     end else
+           begin
+            {erro de conexão com o banco}
+             Result := 500;
+             retornos.preecheRetorno('Erro interto','tente mais tarde',false);
+           end;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+
+   {BUSCAR IMPOSTO}
+   function buscar_imposto(descricao:string;pagina,registro:integer):integer;
+  var
+   query       : TFDQuery;
+   LJSONArray  : TJSONArray;
+   conexao     : TFDConnection;
+  begin
+       conexao          := TFDConnection.Create(nil);
+       query            := TFDQuery.Create(nil);
+       query.Connection := conexao;
+
+       with conexao.Params do
+        begin
+          Clear;
+          Add('DriverID='+funcoes.dbDriver);
+          Add('Database='+funcoes.dbNome);
+          Add('User_Name='+funcoes.dbUser);
+          Add('Password='+funcoes.dbSenha);
+          Add('Port='+funcoes.dbPorta);
+          Add('Server='+funcoes.dbHost);
+        end;
+
+      try
+       conexao.Connected := True;
+       except
+       conexao.Connected := False;
+      end;
+
+    if conexao.Connected = true then
+     begin
+        try
+           query.SQL.Clear;
+           query.SQL.Add(' SELECT '+
+                         ' nome_perfil'+
+                         ',cod_icms_cst'+
+                         ',cod_mod_bc'+
+                         ',cod_cson_cst'+
+                         ',cod_cst_cofins'+
+                         ',cod_trib_pis'+
+                         ',cod_ipi_cst'+
+                         ',perc_icms'+
+                         ',perc_pis'+
+                         ',perc_ipi'+
+                         ',perc_cofins'+
+                         ',cod_perfil'+
+                         ' FROM perfil_tributario where nome_perfil like ''%'+descricao+'%'' AND cod_usuario='''+funcoes.CodUsuarioLogado+'''  ORDER BY nome_perfil ASC  LIMIT '+IntToStr(registro)+' OFFSET('+IntToStr(pagina)+' - 1) * '+IntToStr(registro)+' ');
+           query.Open;
+
+
+
+           if query.FieldByName('cod_perfil').AsString = '' then
+              begin
+                 result := 404;
+                 funcoes.ResultadoJson := funcoes.JsonNegado;
+              end else
+                   begin
+                      result := 200;
+                      LJSONArray            := query.ToJSONArray;
+                      funcoes.ResultadoJson := '{"impostos":'+ LJSONArray.Format+'}';
+                      LJSONArray.Free;
+                   end;
+           except
+            on E: Exception do
+             begin
+              Result := 500;
+              funcoes.logErro(e.Message);
+             end;
+        end;
+     end else
+           begin
+            {erro de conexão com o banco}
+             Result := 500;
+             funcoes.statusHTTP(500);
+           end;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+
+   {VERIFICA NOME DO IMPOSTO}
+   function verificaNome(nome,codigoUsuario:string):Boolean;
+  var
+   query: TFDQuery;
+   conexao : TFDConnection;
+  begin
+
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+     with conexao.Params do
+        begin
+          Clear;
+          Add('DriverID='+funcoes.dbDriver);
+          Add('Database='+funcoes.dbNome);
+          Add('User_Name='+funcoes.dbUser);
+          Add('Password='+funcoes.dbSenha);
+          Add('Port='+funcoes.dbPorta);
+          Add('Server='+funcoes.dbHost);
+        end;
+
+      try
+       conexao.Connected := True;
+       except
+       conexao.Connected := False;
+      end;
+
+      try
+       query.Close;
+       query.SQL.Add('SELECT  nome_perfil from perfil_tributario where nome_perfil = '''+nome+'''  AND cod_usuario = '''+codigoUsuario+'''');
+       query.Open();
+
+       if query.RowsAffected <>0 then
+           begin
+             Result := False;
+           end else
+                begin
+                  Result := True;
+                end;
+       finally
+
+      end;
+     freeandnil(query);
+     FreeAndNil(conexao);
+  end;
+
+
+   {VERIFICA IMPOSTO AO ATUALIZAR}
+   function verificaUPDATENome(nome,codigo_imposto:string):boolean;
+  var
+   query: TFDQuery;
+   cnpjUsado:string;
+    conexao : TFDConnection;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+     with conexao.Params do
+        begin
+          Clear;
+          Add('DriverID='+funcoes.dbDriver);
+          Add('Database='+funcoes.dbNome);
+          Add('User_Name='+funcoes.dbUser);
+          Add('Password='+funcoes.dbSenha);
+          Add('Port='+funcoes.dbPorta);
+          Add('Server='+funcoes.dbHost);
+        end;
+
+      try
+       conexao.Connected := True;
+       except
+       conexao.Connected := False;
+      end;
+
+
+    if conexao.Connected = true then
+     begin
+        try
+
+         query.Close;
+         query.SQL.Add('SELECT nome_perfil FROM perfil_tributario WHERE cod_perfil = '''+codigo_imposto+'''');
+         query.Open;
+
+         cnpjUsado :=  query.FieldByName('nome_perfil').AsString;
+         query.SQL.Clear;
+
+         query.Close;
+         query.SQL.Add('SELECT cod_perfil FROM perfil_tributario WHERE nome_perfil = '''+nome+''' and cod_usuario = '''+funcoes.CodUsuarioLogado+'''');
+         query.Open;
+
+         if query.RowsAffected >= 1 then
+            begin
+              if cnpjUsado = nome then
+                 begin
+                    Result := True;
+                 end else
+                       begin
+                         Result := False;
+                       end;
+            end else
+                  begin
+                    Result := True;
+                  end;
+
+           except
+            on E: Exception do
+             begin
+              Result := False;
+              retornos.preecheRetorno('Erro ao alterar imposto',e.Message,false);
+              funcoes.logErro(e.Message);
+             end;
+        end;
+     end else
+           begin
+            {erro de conexão com o banco}
+             Result := False;
+             retornos.preecheRetorno('Erro interno','Erro ao se conectar ao banco dados',false);
+           end;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+
+end.

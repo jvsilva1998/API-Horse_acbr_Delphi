@@ -1,0 +1,281 @@
+unit nfe;
+
+interface
+
+uses
+  XData.Service.Common,
+  parametros,
+  regras_nfe,
+  System.JSON,
+  funcoes,
+  XData.Server.Module,
+  System.SysUtils,
+  dialogs;
+
+type
+  [ServiceContract]
+  [Route('')]
+  Infe = interface(IInvokable)
+    ['{49034E5D-88BF-479C-BAFF-68C9A8E1E543}']
+    [httppost]function    emitir(dadods:parametros.dadosNfce):TJSonObject;
+    [httppost]function    buscar([FromPath]registros:Integer; [FromPath]pagina:integer;dadods:parametros.dadosConsulta):TJSonObject;
+    [httpdelete]function cancelar([FromPath]id:string;motivo:string):TJSonObject;
+    [httppost]function   correcao([FromPath]id:string;correcao:string):TJSonObject;
+    [httpget]function    eventos([FromPath]pagina:integer;[FromPath]registros:integer;id:string):TJSonObject;
+    [httppost]function   inutiliza(serie,numeroInicio,numeroFim:Int64;justificativa:string):TJSonObject;
+    [httpget]function    inutilizacoes([FromPath]pagina:integer;[FromPath]registros:integer):TJSonObject;
+    [Route('rascunho/novo/')][httppost]function novoRascunho(jsonNota:string;cliente:string;tipoNota:integer;valor:double):TJSonObject;
+    [httppost] [Route('rascunho/buscar/')]function buscarRascunhos([FromPath]registros:Integer;[FromPath]pagina:integer;dadods:parametros.consultaRascunhos):TJSonObject;
+    [httpdelete] [Route('rascunho/remover/')]function removerRascunho([FromPath]codigo:string):TJSonObject;
+    [httpput] [Route('rascunho/alterar/')]function alterarRascunho([FromPath]codigo:string;jsonNota:string;cliente:string;valor:double ):TJSonObject;
+
+
+    end;
+    [ServiceImplementation]
+      TInfe = class(TInterfacedObject, Infe)
+      private
+       function  emitir(dadods:parametros.dadosNfce):TJSonObject;
+       function  buscar(registros,pagina:integer;dadods:parametros.dadosConsulta):TJSonObject;
+       function  cancelar(id:string;motivo:string):TJSonObject;
+       function  correcao(id:string;correcao:string):TJSonObject;
+       function  eventos(pagina:integer;registros:integer;id:string):TJSonObject;
+       function  inutiliza(serie,numeroInicio,numeroFim:Int64;justificativa:string):TJSonObject;
+       function  inutilizacoes(pagina:integer;registros:integer):TJSonObject;
+       function  novoRascunho(jsonNota:string;cliente:string;tipoNota:integer;valor:double):TJSonObject;
+       function  buscarRascunhos(registros:Integer;pagina:integer;dadods:parametros.consultaRascunhos):TJSonObject;
+       function  removerRascunho(codigo:string):TJSonObject;
+       function  alterarRascunho([FromPath]codigo:string;jsonNota:string;cliente:string;valor:double ):TJSonObject;
+  end;
+
+
+implementation
+ var
+  usando:Boolean;
+
+
+function TInfe.alterarRascunho(codigo, jsonNota, cliente: string;
+  valor: double): TJSonObject;
+ begin
+
+ end;
+
+function TInfe.buscar(registros, pagina: integer;
+  dadods: parametros.dadosConsulta): TJSonObject;
+ var
+   usuario    : TJSONObject;
+   resultado  : TJSONObject;
+ begin
+     usuario           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuario.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado := regras_nfe.consultarNFE(usuario.P['dadosRetorno'].P['usuario'].a[0],dadods,pagina,registros);
+            if resultado.FindValue('codigoHttp').Value = '200' then
+               begin
+                result      := TJSonObject.ParseJSONValue(resultado.P['dadosRetorno'].ToString) as TJSonObject;
+               end else
+                   begin
+                    result  :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+                   end;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').Value));
+      end else
+           begin
+            result := TJSonObject.ParseJSONValue(usuario.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(usuario.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+function TInfe.emitir(dadods:parametros.dadosNfce): TJSonObject;
+  var
+   resultado      : TJSONObject;
+   usuario        : TJSONObject;
+ begin
+
+         usuario  := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+              if usuario.FindValue('codigoHttp').value = '200' then
+                begin
+
+                      resultado  :=  regras_nfe.emitirNFE(usuario.P['dadosRetorno'].P['usuario'].a[0],dadods);
+                      result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+                      funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+                end else
+                     begin
+                       result := TJSonObject.ParseJSONValue(usuario.P['mensagemRetorno'].ToString) as TJSonObject;
+                       funcoes.statusHTTP(strtoint(usuario.FindValue('codigoHttp').Value));
+                     end;
+ end;
+
+
+function TInfe.eventos(pagina:integer;registros:integer;id:string): TJSonObject;
+ var
+   usuario    : TJSONObject;
+   resultado  : TJSONObject;
+ begin
+     usuario           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuario.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado := regras_nfe.consultarEVENTOS(usuario.P['dadosRetorno'].P['usuario'].a[0],id,pagina,registros);
+            if resultado.FindValue('codigoHttp').Value = '200' then
+               begin
+                result      := TJSonObject.ParseJSONValue(resultado.P['dadosRetorno'].ToString) as TJSonObject;
+               end else
+                   begin
+                    result  :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+                   end;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').Value));
+      end else
+           begin
+            result := TJSonObject.ParseJSONValue(usuario.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(usuario.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+
+function TInfe.inutiliza(serie, numeroInicio, numeroFim: Int64;
+  justificativa: string): TJSonObject;
+  var
+   resultado      : TJSONObject;
+   usuario        : TJSONObject;
+ begin
+     usuario           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuario.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado  :=  regras_nfe.inutilizarNFE(usuario.P['dadosRetorno'].P['usuario'].a[0],serie,numeroInicio,numeroFim,justificativa);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(usuario.P['mensagemRetorno'].ToString) as TJSonObject;
+             funcoes.statusHTTP(strtoint(usuario.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+
+function TInfe.inutilizacoes(pagina, registros: integer): TJSonObject;
+ var
+   usuario    : TJSONObject;
+   resultado  : TJSONObject;
+ begin
+     usuario           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuario.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado := regras_nfe.consultarINUTILIZACOES(usuario.P['dadosRetorno'].P['usuario'].a[0],pagina,registros);
+            if resultado.FindValue('codigoHttp').Value = '200' then
+               begin
+                result      := TJSonObject.ParseJSONValue(resultado.P['dadosRetorno'].ToString) as TJSonObject;
+               end else
+                   begin
+                    result  :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+                   end;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').Value));
+      end else
+           begin
+            result := TJSonObject.ParseJSONValue(usuario.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(usuario.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+function TInfe.novoRascunho(jsonNota, cliente: string; tipoNota: integer;
+  valor: double): TJSonObject;
+  var
+   resultado      : TJSONObject;
+   usuario        : TJSONObject;
+ begin
+     usuario           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuario.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado  :=  regras_nfe.gravarRascunho(usuario.P['dadosRetorno'].P['usuario'].a[0],jsonNota,tipoNota,cliente,currtostr(valor));
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(usuario.P['mensagemRetorno'].ToString) as TJSonObject;
+             funcoes.statusHTTP(strtoint(usuario.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+function TInfe.removerRascunho(codigo: string): TJSonObject;
+  var
+   resultado      : TJSONObject;
+   usuario        : TJSONObject;
+ begin
+     usuario           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuario.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado  :=  regras_nfe.removerRascunho(usuario.P['dadosRetorno'].P['usuario'].a[0],codigo);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(usuario.P['mensagemRetorno'].ToString) as TJSonObject;
+             funcoes.statusHTTP(strtoint(usuario.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+function TInfe.buscarRascunhos(registros, pagina: integer;
+  dadods: parametros.consultaRascunhos): TJSonObject;
+ var
+   usuario    : TJSONObject;
+   resultado  : TJSONObject;
+ begin
+     usuario           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuario.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado := regras_nfe.buscaRascunhos(usuario.P['dadosRetorno'].P['usuario'].a[0],dadods,pagina,registros);
+            if resultado.FindValue('codigoHttp').Value = '200' then
+               begin
+                result      := TJSonObject.ParseJSONValue(resultado.P['dadosRetorno'].ToString) as TJSonObject;
+               end else
+                   begin
+                    result  :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+                   end;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').Value));
+      end else
+           begin
+            result := TJSonObject.ParseJSONValue(usuario.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(usuario.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+function TInfe.cancelar(id, motivo: string): TJSonObject;
+  var
+   resultado      : TJSONObject;
+   usuario        : TJSONObject;
+ begin
+     usuario           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuario.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado  :=  regras_nfe.cancelaNFE(usuario.P['dadosRetorno'].P['usuario'].a[0],id,motivo);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(usuario.P['mensagemRetorno'].ToString) as TJSonObject;
+             funcoes.statusHTTP(strtoint(usuario.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+
+function TInfe.correcao(id, correcao: string): TJSonObject;
+  var
+   resultado      : TJSONObject;
+   usuario        : TJSONObject;
+ begin
+     usuario           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuario.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado  :=  regras_nfe.correcaoNFE(usuario.P['dadosRetorno'].P['usuario'].a[0],id,correcao);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(usuario.P['mensagemRetorno'].ToString) as TJSonObject;
+             funcoes.statusHTTP(strtoint(usuario.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+initialization
+  RegisterServiceType(TypeInfo(Infe));
+  RegisterServiceType(TInfe);
+
+end.
+

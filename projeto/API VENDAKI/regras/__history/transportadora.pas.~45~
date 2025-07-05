@@ -1,0 +1,450 @@
+unit transportadora;
+
+interface
+
+uses
+  System.SysUtils,
+  Vcl.Dialogs,
+  FireDAC.Comp.Client,
+  parametros,
+  System.JSON,
+  DataSet.Serialize,
+  retornos;
+
+  function cadastra_transportadora(dados:parametros.transportadoras;cod_usuario:string):TJSONObject;
+  function remover_transportadora(codigo:string;cod_usuario:string):TJSONObject;
+  function alterar_transportadora(codigo:string;dados:parametros.transportadoras;cod_usuario:string):TJSONObject;
+  function buscar_transportadora(nome,cnpj,codigo:string;registro,pagina:integer;cod_usuario:string):TJSONObject;
+  function verificaExiste(cnpj:string;conexao:TFDConnection;codUsuario:string):Boolean;
+  function verificaExisteUPDATE(cnpj:string;codigoCliente:string;conexao:TFDConnection;cod_usuario:string):Boolean;
+
+implementation
+   uses dm_data, funcoes;
+
+  function cadastra_transportadora(dados:parametros.transportadoras;cod_usuario:string):TJSONObject;
+  var
+   query              : TFDQuery;
+   conexao            : TFDConnection;
+   codigo             : string;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+     codigo           := funcoes.trigger;
+
+        try
+         conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+
+         if verificaExiste(dados.cpfCnpj,conexao,cod_usuario) = false then
+              begin
+               tituloMensagem := 'Não foi possivel cadastrar';
+               mensagem       := 'Transportadora já existe';
+               codigoHttp     := 409;
+
+               json           := '{ '+
+                           '  "mensagemRetorno": {  '+
+                           '   "titulo": "'+ tituloMensagem  +'", '+
+                           '   "mensagem": "'+ mensagem  +'" '+
+                           ' }, '+
+                           ' "dadosRetorno": [], '+
+                           ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                           ' }' ;
+
+                  Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                  freeandnil(query);
+                  FreeAndNil(conexao);
+                  Exit;
+              end;
+
+         query.SQL.Add
+         ('INSERT INTO TRANSPORTADORAS(nome_razao,'+
+                                 'tipo_transportadora,'+
+                                 'cpf_cnpj,'+
+                                 'ie,'+
+                                 'im,'+
+                                 'endereco,'+
+                                 'numero,'+
+                                 'bairro,'+
+                                 'cidade,'+
+                                 'telefone,'+
+                                 'celular,'+
+                                 'email,'+
+                                 'uf,'+
+                                 'cep,'+
+                                 'obs,'+
+                                 'placa_veiculo,'+
+                                 'uf_veiculo,'+
+                                 'rntc_veiculo,'+
+                                 'cod_transportadora,'+
+                                 'hora_cadastro,'+
+                                 'data_cadastro,'+
+                                 'cod_usuario)values(');
+
+
+         query.SQL.Add(''''  +dados.nomeRazao+'''');
+         query.SQL.Add(',''' +IntToStr(dados.tipoTranportadora)   +'''');
+         query.SQL.Add(',''' +dados.cpfCnpj+ '''');
+         query.SQL.Add(',''' +IntToStr(dados.ie)+ '''');
+         query.SQL.Add(',''' +IntToStr(dados.im)+ '''');
+         query.SQL.Add(',''' +dados.endereco.endereoo+ '''');
+         query.SQL.Add(',''' +dados.endereco.numero+ '''');
+         query.SQL.Add(',''' +dados.endereco.bairro+ '''');
+         query.SQL.Add(',''' +dados.endereco.cidade+ '''');
+         query.SQL.Add(',''' +dados.telefone+ '''');
+         query.SQL.Add(',''' +dados.celular+ '''');
+         query.SQL.Add(',''' +dados.email+ '''');
+         query.SQL.Add(',''' +dados.endereco.uf+ '''');
+         query.SQL.Add(',''' +dados.endereco.cep+ '''');
+         query.SQL.Add(',''' +dados.obs+ '''');
+         query.SQL.Add(',''' +dados.veiculo.placa+ '''');
+         query.SQL.Add(',''' +dados.veiculo.ufPlaca+ '''');
+         query.SQL.Add(',''' +dados.veiculo.RNTC+ '''');
+         query.SQL.Add(',''' +codigo+ '''');
+         query.SQL.Add(',''' +timetostr(now)+'''');
+         query.SQL.Add(',''' +funcoes.formataData(DateToStr(now))+'''');
+         query.SQL.Add(',''' +cod_usuario+ ''')');
+         query.ExecSQL;
+
+
+         if query.RowsAffected = 1 then
+            begin
+              tituloMensagem := 'Transportadora cadastrada';
+              mensagem       :=  codigo;
+              codigoHttp     := 201;
+            end;
+
+           except
+            on E: Exception do
+             begin
+              tituloMensagem := 'Erro interno';
+              mensagem       :=  funcoes.RemoveAcento(e.Message);
+              codigoHttp     := 500;
+              funcoes.logErro(e.Message);
+             end;
+        end;
+       json           := '{ '+
+                   '  "mensagemRetorno": {  '+
+                   '   "titulo": "'+ tituloMensagem  +'", '+
+                   '   "mensagem": "'+ mensagem  +'" '+
+                   ' }, '+
+                   ' "dadosRetorno": [], '+
+                   ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                   ' }' ;
+
+          Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+          freeandnil(query);
+          FreeAndNil(conexao);
+  end;
+
+  function remover_transportadora(codigo:string;cod_usuario:string):TJSONObject;
+   var
+   query              : TFDQuery;
+   conexao            : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+        try
+         conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+         query.SQL.Add('DELETE FROM TRANSPORTADORAS WHERE cod_transportadora = '''+codigo+''' and cod_usuario = '''+cod_usuario+'''');
+         query.ExecSQL;
+
+          if query.RowsAffected = 1 then
+                begin
+                   tituloMensagem := 'tudo certo';
+                   mensagem       := 'Transportadora removida';
+                   codigoHttp     := 200;
+                end else
+                     begin
+                       tituloMensagem := 'não foi possivel remover';
+                       mensagem       := 'Transportadora não existe';
+                       codigoHttp     := 404;
+                     end;
+           except
+            on E: Exception do
+             begin
+               tituloMensagem := 'Erro interno';
+               mensagem       :=  funcoes.RemoveAcento(e.Message);
+               codigoHttp     := 500;
+             end;
+        end;
+       json           := '{ '+
+                   '  "mensagemRetorno": {  '+
+                   '   "titulo": "'+ tituloMensagem  +'", '+
+                   '   "mensagem": "'+ mensagem  +'" '+
+                   ' }, '+
+                   ' "dadosRetorno": [], '+
+                   ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                   ' }' ;
+
+          Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+          freeandnil(query);
+          FreeAndNil(conexao);
+  end;
+
+  function alterar_transportadora(codigo:string;dados:parametros.transportadoras;cod_usuario:string):TJSONObject;
+  var
+   query           : TFDQuery;
+   conexao         : TFDConnection;
+   json            : string;
+   codigoHttp      : integer;
+   mensagem        : string;
+   tituloMensagem  : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+
+        try
+           conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+
+           if verificaExisteUPDATE(dados.cpfCnpj,codigo,conexao,cod_usuario) = false then
+              begin
+               tituloMensagem := 'Não foi possivel cadastrar';
+               mensagem       := 'A transportadora já existe';
+               codigoHttp     := 409;
+               json           := '{ '+
+                   '  "mensagemRetorno": {  '+
+                   '   "titulo": "'+ tituloMensagem  +'", '+
+                   '   "mensagem": "'+ mensagem  +'" '+
+                   ' }, '+
+                   ' "dadosRetorno": [], '+
+                   ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                   ' }' ;
+                Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                freeandnil(query);
+                FreeAndNil(conexao);
+              end;
+
+           query.SQL.Add('UPDATE transportadoras SET nome_razao= ''' + dados.nomeRazao+ '''');
+           query.SQL.Add(',tipo_transportadora= ''' + IntToStr(dados.tipoTranportadora) + '''');
+           query.SQL.Add(',cpf_cnpj= ''' +dados.cpfCnpj+ '''');
+           query.SQL.Add(',ie= ''' +inttostr(dados.ie)+ '''');
+           query.SQL.Add(',im= ''' +inttostr(dados.im)+ '''');
+           query.SQL.Add(',endereco= ''' + dados.endereco.endereoo+ '''');
+           query.SQL.Add(',numero= ''' + dados.endereco.numero+ '''');
+           query.SQL.Add(',bairro= ''' +dados.endereco.bairro+ '''');
+           query.SQL.Add(',cidade= ''' +dados.endereco.cidade+ '''');
+           query.SQL.Add(',telefone= ''' + dados.telefone+ '''');
+           query.SQL.Add(',celular= ''' + dados.celular+ '''');
+           query.SQL.Add(',email= ''' + funcoes.RemoveAcento(dados.email)+ '''');
+           query.SQL.Add(',uf= ''' + dados.endereco.uf+ '''');
+           query.SQL.Add(',cep= '''+dados.endereco.cep+ '''');
+           query.SQL.Add(',obs= ''' + dados.obs+ '''');
+           query.SQL.Add(',placa_veiculo= ''' + dados.veiculo.placa+ '''');
+           query.SQL.Add(',uf_veiculo= ''' + dados.veiculo.ufPlaca+ '''');
+           query.SQL.Add(',rntc_veiculo= ''' + dados.veiculo.RNTC+ '''');
+           query.SQL.Add('WHERE cod_transportadora = '''+codigo+''' AND cod_usuario = '''+cod_usuario+'''');
+           query.ExecSQL;
+
+            if query.RowsAffected = 1 then
+                begin
+                   tituloMensagem := 'Tudo certo';
+                   mensagem       := 'Transportadora atualizada';
+                   codigoHttp     := 200;
+                end else
+                     begin
+                       tituloMensagem := 'Não foi possivel atualizar';
+                       mensagem       := 'Transportadora não existe';
+                       codigohttp     := 404;
+                     end;
+           except
+            on E: Exception do
+             begin
+               tituloMensagem := 'Erro interno';
+               mensagem       :=  funcoes.RemoveAcento(e.Message);
+               codigohttp     := 404;
+               funcoes.logErro(e.Message);
+             end;
+        end;
+       json           := '{ '+
+                   '  "mensagemRetorno": {  '+
+                   '   "titulo": "'+ tituloMensagem  +'", '+
+                   '   "mensagem": "'+ mensagem  +'" '+
+                   ' }, '+
+                   ' "dadosRetorno": [], '+
+                   ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                   ' }' ;
+
+          Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+          freeandnil(query);
+          FreeAndNil(conexao);
+  end;
+
+  function buscar_transportadora(nome,cnpj,codigo:string;registro,pagina:integer;cod_usuario:string):TJSONObject;
+   var
+   query              : TFDQuery;
+   LJSONArray         : TJSONArray;
+   codigoif           : string;
+   conexao            : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   dados              : string;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+
+    if codigo <> '%' then
+       begin
+        codigoif := 'and cod_transportadora = '''+codigo+'''';
+       end else
+             begin
+               codigoif := 'and cod_transportadora like ''%'+codigo+'%''';
+             end;
+
+
+        try
+           conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+           query.Close;
+           query.SQL.Add(' SELECT '+
+                         ' nome_razao'+
+                         ',fantasia_apelido'+
+                         ',tipo_cliente'+
+                         ',tipo_contribuinte'+
+                         ',cpf_cnpj'+
+                         ',RNTRC'+
+                         ',ie'+
+                         ',im'+
+                         ',endereco'+
+                         ',numero'+
+                         ',complemento'+
+                         ',bairro'+
+                         ',cidade'+
+                         ',telefone'+
+                         ',celular'+
+                         ',email'+
+                         ',uf'+
+                         ',cep'+
+                         ',obs'+
+                         ',cod_cidade'+
+                         ',cod_transportadora'+
+                         ' FROM TRANSPORTADORAS where cpf_cnpj like ''%'+cnpj+'%'' AND nome_razao like ''%'+nome+'%'' '+codigoif+'  AND cod_usuario='''+cod_usuario+''' ORDER BY nome_razao ASC  LIMIT '+IntToStr(registro)+' OFFSET('+IntToStr(pagina)+' - 1) * '+IntToStr(registro)+' ');
+           query.Open;
+
+           if query.RowsAffected = 0 then
+              begin
+                tituloMensagem := 'transportadoras';
+                mensagem       := 'Nenhuma informação encontrada';
+                codigoHttp     := 404;
+              end else
+                   begin
+                      codigoHttp := 200;
+                      LJSONArray := query.ToJSONArray;
+                      dados      := '"transportadoras":'+ LJSONArray.Format;
+                      LJSONArray.Free;
+                   end;
+           except
+            on E: Exception do
+             begin
+                tituloMensagem := 'Erro interno';
+                mensagem       := funcoes.RemoveAcento(e.Message);
+                codigoHttp     := 500;
+             end;
+        end;
+      json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": { '+ dados +'}, '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+ {VERIFICA SE A TRANSPORTADORA JÁ EXISTE}
+ function verificaExiste(cnpj:string;conexao:TFDConnection;codUsuario:string):Boolean;
+  var
+   query: TFDQuery;
+  begin
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+        try
+         query.Close;
+         query.SQL.Add('SELECT cod_transportadora FROM transportadoras WHERE cpf_cnpj = '''+ cnpj +''' and cod_usuario = '''+codUsuario+'''');
+         query.Open;
+
+         if   query.RowsAffected  > 0 then
+            begin
+              Result := False;
+            end else
+                  begin
+                    Result := True;
+                  end;
+
+           except
+            on E: Exception do
+             begin
+              Result := False;
+              //retornos.preecheRetorno('Erro ao cadastrar transportadora',e.Message,false);
+              funcoes.logErro(e.Message);
+             end;
+        end;
+      freeandnil(query);
+  end;
+
+ {VERIFICA SE A TRANSPORTADORA EXISTE QUANDO FOR ATUALIZAR}
+ function verificaExisteUPDATE(cnpj:string;codigoCliente:string;conexao:TFDConnection;cod_usuario:string):Boolean;
+  var
+   query: TFDQuery;
+   cnpjUsado:string;
+  begin
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+        try
+         query.Close;
+         query.SQL.Add('SELECT cpf_cnpj FROM transportadoras WHERE cod_transportadora = '''+codigoCliente+''' and cod_usuario = '''+cod_usuario+'''');
+         query.Open;
+
+         cnpjUsado :=  query.FieldByName('cpf_cnpj').AsString;
+         query.SQL.Clear;
+
+         query.Close;
+         query.SQL.Add('SELECT cod_transportadora FROM transportadoras WHERE cpf_cnpj = '''+cnpj+''' and cod_usuario = '''+cod_usuario+'''');
+         query.Open;
+
+         if query.RowsAffected >= 1 then
+            begin
+              if cnpjUsado = cnpj then
+                 begin
+                    Result := True;
+                 end else
+                       begin
+                         Result := False;
+                       end;
+            end else
+                  begin
+                    Result := True;
+                  end;
+
+           except
+            on E: Exception do
+             begin
+              Result := False;
+             // retornos.preecheRetorno('Erro ao alterar transportadora',e.Message,false);
+              funcoes.logErro(e.Message);
+             end;
+        end;
+      freeandnil(query);
+  end;
+
+
+
+end.

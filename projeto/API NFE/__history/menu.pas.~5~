@@ -1,0 +1,39 @@
+unit menu;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ExtCtrls, XData.Server.Module,
+  Sparkle.HttpServer.Module, Sparkle.HttpServer.Context, Sparkle.Comp.Server,
+  Sparkle.Comp.CorsMiddleware, XData.Comp.Server,
+  Sparkle.Comp.HttpSysDispatcher, Vcl.StdCtrls, FireDAC.Stan.Intf,
+  FireDAC.Stan.Option, FireDAC.Stan.Error, FireDAC.UI.Intf, FireDAC.Phys.Intf,
+  FireDAC.Stan.Def, FireDAC.Stan.Pool, FireDAC.Stan.Async, FireDAC.Phys,
+  FireDAC.VCLUI.Wait, Data.DB, FireDAC.Comp.Client,FireDAC.DApt,
+  FireDAC.Phys.PGDef, FireDAC.Phys.PG, ACBrBase, ACBrDFeReport,
+  ACBrDFeDANFeReport, ACBrNFeDANFEClass, ACBrNFeDANFEFR;
+
+type
+  TForm1 = class(TForm)
+    Panel1: TPanel;
+    Edit1: TEdit;
+    SparkleHttpSysDispatcher1: TSparkleHttpSysDispatcher;
+    XDataServer1: TXDataServer;
+    XDataServer1CORS: TSparkleCorsMiddleware;
+    FDPhysPgDriverLink1: TFDPhysPgDriverLink;
+    ACBrNFeDANFEFR1: TACBrNFeDANFEFR;
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  Form1: TForm1;
+
+implementation
+
+{$R *.dfm}
+
+end.

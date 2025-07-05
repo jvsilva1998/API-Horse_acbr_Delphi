@@ -1,0 +1,284 @@
+unit parametros;
+
+interface
+uses
+system.classes;
+type
+
+
+
+
+  enderecoDestinatario = class
+     endereco:string;
+     numero:string;
+     complemento:string;
+     bairro:string;
+     cidade:string;
+     codigoCidade:string;
+     uf:string;
+     cep:string;
+     pais:string;
+     codigoPais:Int64;
+  end;
+
+   infoDestinatario = class
+     nomeRazao:string;
+     cpfCnpj:string;
+     tipoContribuinte: Int64;   // 1- conruibuente 2- não contruinente 3- isento
+     inscricaoEstadual:string;
+     inscricaoMunicipal:string;
+     email:string;
+     telefone:string;
+   end;
+
+
+
+  destinatario = class      // DESTINATARIO//
+   info:infoDestinatario;
+   infoEndereco:enderecoDestinatario;
+  end;
+
+
+
+    veiculo = class
+   placa:string;
+   uf:string;
+   rntc:string;
+  end;
+
+  transportadora = class
+   nome:string;
+   cpfCnpj:string;
+   ie:string;
+   endereco:string;
+   municipio:string;
+   uf:string;
+   infoVeiculo:veiculo;
+  end;
+
+
+  volume = class
+     especie:string;
+     marca:string;
+     numeroVolume:string;
+     quantidadeVolume:Int64;
+     pesoLiquido:Double;
+     pesoBruto:Double;
+  end;
+
+
+
+ moodoFrete = class
+   valor : Double;
+   tipoFrete:Int64; // 1- emiente 2- destinatario 3 - terceiros 4 - sem frete//
+ end;
+
+
+  frete = class      // FRETE//
+    modoFrete:moodoFrete;
+    transporte:transportadora;
+    volume:volume;
+  end;
+
+
+
+
+  formas = class
+    tipo:Int64;  // 1- dinheiro 2 - credito 3- debito 4- pix 5- duplicata 6- sem pagamento
+    valor:Double;
+  end;
+
+  Formaspagamento = class   // PAGAMENTOS //
+    pagamentos: tarray <formas>;
+    troco:Double;
+    tipoPagamento:Int64; // 1 - á vista 2- prazo 3- nenhum//
+  end;
+
+
+  natureza = class  // NATUREZA OPERAÇÃO //
+    descricao:string;
+    cfopInterno:string;
+    cfopExterno:string;
+  end;
+
+
+
+    {DADOS ENDEREÇO DA EMPRESA}
+   endereco = class
+    endereco:string;
+    complemento:string;
+    numero:string;
+    cep:string;
+    bairro:string;
+    cidade:string;
+    codigoCidade:int64;
+    uf:string;
+   end;
+
+
+  {DADOS DA EMPRESA}
+  empresa = class
+    cnpj: string;
+    razao: string;
+    fantasia:string;
+    inscricaoEstadual:string;
+    inscricaoMunicipal:string;
+    cnae: string;
+    regime: Int64;    // 1 MEI - 2 SIMPLES NACIONAL // 3 -REGIME NORMAL//
+    segmento:Int64;  // 1 COMERCIO // 2 TRANSPORTE // 3 SERVIÇO // 4 INDUSTRIA // 5 OUTROS//
+    telefone:string;
+  end;
+
+
+
+   {DADOS ALTERAÇÕES EMPRESA}
+     alteraEmpresa = class
+      empresa : empresa;
+      enderecoEmpresa:endereco;
+     end;
+
+
+  {DADOS ENDEREÇO DA EMPRESA}
+   usuario = class
+    nome:string;
+    email:string;
+    senha:string;
+    celular:string;
+    codigoCobranca:string;
+    codigoIndicador:string;
+    pushToken:string;
+   end;
+
+
+  {USUARIOS}
+  usuarioCadastro = class
+    empresa         : empresa;
+    enderecoEmpresa : endereco;
+    usuario         : usuario;
+  end;
+
+
+    anp = class
+     codigo:String;
+     descricao:string;
+    end;
+
+    ibpt = class
+     percentualFederal: double;
+     percentualEstadual:double;
+     percentualMunicipal: double;
+     fonte:string;
+    end;
+
+
+    icms = class
+      origemProduto:Int64;
+      tributacao:Int64;
+      csosn:Int64;
+      aliquota:Double;
+      modalidadeBc:int64;
+      mva:Double;     //quando for margem valor agregado//
+      bcIcms:Double; //informar o valor da BC///
+    end;
+
+
+    pis = class
+      tributacao:Int64;
+      aliquota:Double;
+    end;
+
+
+    cofins = class
+      tributacao:Int64;
+      aliquota:Double;
+    end;
+
+
+    ipi = class
+      tributacao:Int64;
+      aliquota:Double;
+    end;
+
+
+
+  impostos = class // IMPOSTOS//
+    icms:icms;
+    pis:pis;
+    ipi:ipi;
+    cofins:cofins;
+    ibpt:ibpt;
+    anp:anp;
+  end;
+
+
+  {INFORMAÇÕES DO PRODUTO}
+   infProduto = class
+      descricao:string;
+      ean:string;
+      codigoInterno:string;
+      medida:string;
+      ncm:string;
+      cest:string;
+      cfop:string;
+      quantidade:Double;
+      valorUnitario:currency;
+      valorDesconto:currency;
+      valorAcrescimo:Currency;
+      impostos:impostos;
+  end;
+
+
+   {DUPLICATAS}
+    duplicatas = class
+      vencimento:TDate;
+      valor:Double;
+    end;
+
+    {informações da nota}
+    infoNota = class
+      tipoAmbiente:Int64; // 1- produção -2 homologação//
+      tipoNota:Int64; //1- saida 2- entrada//
+      tipoFinalidade:int64; //1- normal 2 - complementar 3- ajuste 4- devolução//
+      dadosAdcionais:string;
+    end;
+
+    {outros}
+
+    totais = class
+     valorSeguro:Double;
+    end;
+
+
+     referencias = class
+      chaveAcesso:string;
+     end;
+
+
+  dadosNfce = class
+   info            : infoNota;
+   natureza        : natureza;
+   infProduto      : tarray <infProduto>;
+   destinatario    : destinatario;
+   formaPagamento  : Formaspagamento;
+   duplicatas      : tarray <duplicatas>;
+   frete           : frete;
+   outros          : totais;
+   referencia      : tarray <referencias>;
+  end;
+
+
+  dadosConsulta = class
+   chaveAcesso:string;
+   numeroNota:string;
+   numeroDocumento:string;
+   dataInicio,
+   dataFim:tdate;
+   situacaoNota:string;
+   finalidade,
+   ambiente:Int64;
+  end;
+
+
+implementation
+
+end.

@@ -1,0 +1,41 @@
+object dm_dados: Tdm_dados
+  OldCreateOrder = False
+  OnCreate = DataModuleCreate
+  Height = 318
+  Width = 350
+  object conLogError: TFDConnection
+    Params.Strings = (
+      'Database=./logs/erros.s3db'
+      'DriverID=SQLite')
+    Left = 120
+    Top = 24
+  end
+  object conCalll: TFDConnection
+    Params.Strings = (
+      'Database=./logs/chamadas.s3db'
+      'DriverID=SQLite')
+    LoginPrompt = False
+    Left = 48
+    Top = 88
+  end
+  object certificado: TACBrNFe
+    Configuracoes.Geral.SSLLib = libNone
+    Configuracoes.Geral.SSLCryptLib = cryNone
+    Configuracoes.Geral.SSLHttpLib = httpNone
+    Configuracoes.Geral.SSLXmlSignLib = xsNone
+    Configuracoes.Geral.FormatoAlerta = 'TAG:%TAGNIVEL% ID:%ID%/%TAG%(%DESCRICAO%) - %MSG%.'
+    Configuracoes.Arquivos.OrdenacaoPath = <>
+    Configuracoes.WebServices.UF = 'SP'
+    Configuracoes.WebServices.AguardarConsultaRet = 0
+    Configuracoes.WebServices.QuebradeLinha = '|'
+    Configuracoes.RespTec.IdCSRT = 0
+    Left = 56
+    Top = 24
+  end
+  object conexao: TFDConnection
+    LoginPrompt = False
+    OnError = conexaoError
+    Left = 112
+    Top = 88
+  end
+end

@@ -1,0 +1,56 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>2021/09/13 08:35:33.000.116,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2021/09/17 20:16:01.000.598,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2021/09/17 20:18:03.000.165,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2022/01/23 13:36:12.000.926,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2022/01/23 15:00:49.000.058,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2022/01/23 15:01:36.000.159,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2022/01/23 15:04:45.000.107,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2022/01/23 15:14:11.000.051,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2022/01/23 15:17:13.000.999,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2022/01/23 15:19:03.000.056,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2022/01/24 08:22:13.000.463,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2022/01/24 08:37:11.000.583,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2022/01/24 08:37:19.000.924,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit2.pas</Transaction>
+    <Transaction>2022/01/24 09:26:31.000.539,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2022/01/24 09:40:24.000.705,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2022/01/24 09:40:25.000.247,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit2.pas</Transaction>
+    <Transaction>2022/01/24 10:35:49.000.056,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2022/01/24 10:35:56.000.751,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit2.pas</Transaction>
+    <Transaction>2022/01/25 21:11:27.000.062,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2022/01/25 21:13:02.000.614,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2022/01/25 21:20:50.000.467,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2022/05/19 14:13:48.000.372,=C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2022/05/19 14:14:55.000.744,C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.dfm=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\menu.dfm</Transaction>
+    <Transaction>2022/05/19 14:14:55.000.744,C:\Users\a\Documents\Embarcadero\Studio\Projects\Unit1.pas=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\menu.pas</Transaction>
+    <Transaction>2022/05/19 14:15:13.000.718,C:\Users\a\Documents\Embarcadero\Studio\Projects\Project1.dproj=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\api_nfe.dproj</Transaction>
+    <Transaction>2022/05/19 14:31:26.000.607,=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\apiNfeService.pas</Transaction>
+    <Transaction>2022/05/19 14:31:27.000.902,=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\apiNfeServiceImplementation.pas</Transaction>
+    <Transaction>2022/05/19 15:12:38.000.884,=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\NFEServiceImplementation.pas</Transaction>
+    <Transaction>2022/05/19 15:12:38.000.778,=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\NFEService.pas</Transaction>
+    <Transaction>2022/05/19 15:14:45.000.046,=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\Unit1.pas</Transaction>
+    <Transaction>2022/05/19 15:15:01.000.094,C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\Unit1.pas=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\regras\nfe.pas</Transaction>
+    <Transaction>2022/05/19 15:17:32.000.249,C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\NFEService.pas=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\regras\nfe.pas</Transaction>
+    <Transaction>2022/05/19 15:18:23.000.506,C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\regras\nfe.pas=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\regras\regras_nfe.pas</Transaction>
+    <Transaction>2022/05/19 15:18:35.000.701,C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\NFEServiceImplementation.pas=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\servicos\nfe.pas</Transaction>
+    <Transaction>2022/05/19 16:13:14.000.217,=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\Unit1.pas</Transaction>
+    <Transaction>2022/05/19 16:13:34.000.870,C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\Unit1.pas=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\regras\regras_nfce.pas</Transaction>
+    <Transaction>2022/05/19 16:13:42.000.213,=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\Unit1.pas</Transaction>
+    <Transaction>2022/05/19 16:13:57.000.113,C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\Unit1.pas=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\regras\regras_venda.pas</Transaction>
+    <Transaction>2022/05/19 16:14:53.000.632,=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\Unit1.pas</Transaction>
+    <Transaction>2022/05/19 16:15:00.000.935,C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\Unit1.pas=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\servicos\nfce.pas</Transaction>
+    <Transaction>2022/05/19 16:15:09.000.181,=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\Unit1.pas</Transaction>
+    <Transaction>2022/05/19 16:15:19.000.971,C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\Unit1.pas=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\servicos\venda.pas</Transaction>
+    <Transaction>2022/05/19 16:29:50.000.158,=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\Unit1.pas</Transaction>
+    <Transaction>2022/05/19 16:29:57.000.777,C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\Unit1.pas=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\funcoes.pas</Transaction>
+    <Transaction>2022/05/19 16:36:54.000.227,=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\Unit1.pas</Transaction>
+    <Transaction>2022/05/19 16:37:03.000.668,C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\Unit1.pas=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\parametros.pas</Transaction>
+    <Transaction>2022/06/27 16:41:55.000.214,C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\servicos\nfce.pas=</Transaction>
+    <Transaction>2022/06/27 16:41:58.000.757,C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\servicos\venda.pas=</Transaction>
+    <Transaction>2022/06/28 08:06:57.000.173,C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\regras\regras_nfce.pas=</Transaction>
+    <Transaction>2022/06/28 08:07:00.000.585,C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFE\regras\regras_venda.pas=</Transaction>
+    <Transaction>2022/10/24 09:34:16.000.777,C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFCE\api_nfe.dproj=C:\Users\a\Dropbox\PROJETO VENDAKI\WEB\API NFCE\api_nfce.dproj</Transaction>
+  </Transactions>
+</BorlandProject>

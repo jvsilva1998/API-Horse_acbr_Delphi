@@ -1,0 +1,2006 @@
+unit usuario;
+
+interface
+
+uses
+ System.SysUtils,
+ System.Classes,
+ vcl.forms,
+ Vcl.Dialogs,
+ FireDAC.Comp.Client,
+ parametros,
+ System.JSON,
+ EncdDecd,
+ Data.DB,
+ ACBrNFe,
+ ACBrDFeSSL,
+ blcksock,
+ DataSet.Serialize;
+
+
+
+ function cadastro_primeiro_user(dados:parametros.usuarioCadastro):TJSONObject;
+ function logar(email,senha:string):TJSONObject;
+ function logarTOKEN(token:string):TJSONObject;
+ function alteraEmpresa(dados:parametros.alteraEmpresa;cod_usuario:string):TJSONObject;
+ function atualizaContador(cod_usuario,email:string;cnpj:string;nome:string;telefone:string):TJSONObject;
+ function atualizaNfe(cod_usuario:string;serie,numero,ambiente:int64;observacoes:string):TJSONObject;
+ function atualizaNfce(cod_usuario:string;serie,numero,ambiente,largura:int64;csc:string;Idcsc:string;observacoes:string):TJSONObject;
+ function atualizaCertificado(cod_usuario,base64:widestring;senha:string):TJSONObject;
+ function atualizaLogo(cod_usuario,base64:widestring):TJSONObject;
+ function removerLogo(cod_usuario:string):TJSONObject;
+ function verificaExistencia(login,cnpj:string;conexao:TFDConnection):integer;
+ function verificaExistenciaAPI(login,cnpj:string):TJSONObject;
+ function removerCertificado(cod_usuario:string):TJSONObject;
+ function alteraSenha(senhaAntiga,novaSenha,cod_usuario:string):TJSONObject;
+ function novaVenda(cod_usuario:string;dados:parametros.venda):TJSONObject;
+ function historicoVendas(cod_usuario:string;pagina,registros:Integer):TJSONObject;
+ function faturaCredito(cod_usuario:string;dados:parametros.credito):TJSONObject;
+ function historicoCreditos(cod_usuario:string;pagina,registros:Integer):TJSONObject;
+ function saldoCreditos(cod_usuario:string):TJSONObject;
+ function limiteCobranca(cod_usuario:string):TJSONObject;
+
+
+
+
+implementation
+
+uses funcoes;
+
+  {VERIFICA USUARIO EXISTENTE}
+  function verificaExistencia(login,cnpj:string;conexao:TFDConnection):integer;
+var
+  query: TFDQuery;
+  texto: string;
+begin
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+
+   if (login <> '') and (cnpj <> '') then
+       begin
+         texto := 'SELECT count(*) as total FROM USUARIOS WHERE emailusuario=''' + login + ''' or cnpjEmpresa = '''+cnpj+'''';
+       end;
+
+   if (login = '') and (cnpj <> '')  then
+        begin
+         texto := 'SELECT count(*) as total FROM USUARIOS WHERE cnpjEmpresa=''' + cnpj + '''';
+        end;
+
+   if (login <> '') and (cnpj = '')  then
+        begin
+         texto := 'SELECT count(*) as total FROM USUARIOS WHERE emailusuario=''' +login+ '''';
+        end;
+
+  TRY
+   query.Close;
+   query.SQL.Add(texto);
+   query.Open;
+
+    if  query.FieldByName('total').AsInteger >0 then
+         begin
+            Result := 409;
+         end else
+             begin
+                Result := 200;
+             end;
+
+           except
+            on E: Exception do
+             begin
+              Result := 409;
+             end;
+  END;
+  FreeAndNil(query);
+end;
+
+  {CADASTRANDO PRIMEIRO USUÁRIO}
+  function cadastro_primeiro_user(dados:parametros.usuarioCadastro):TJSONObject;
+  var
+   query              : TFDQuery;
+   token              : string;
+   codigoUsuario      : string;
+   conexao            : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+   codigoIndicacao    : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+           with query.Params do
+        begin
+            with Add do
+             begin
+              Name      := 'FANTASIA';
+              ParamType := ptInput;
+              DataType  := ftString;
+
+              Name      := 'RAZAO';
+              ParamType := ptInput;
+              DataType  := ftString;
+
+              Name      := 'RUA';
+              ParamType := ptInput;
+              DataType  := ftString;
+
+              Name      := 'BAIRRO';
+              ParamType := ptInput;
+              DataType  := ftString;
+
+              Name      := 'CIDADE';
+              ParamType := ptInput;
+              DataType  := ftString;
+
+              Name      := 'USUARIO';
+              ParamType := ptInput;
+              DataType  := ftString;
+
+              Name      := 'COMPLEMENTO';
+              ParamType := ptInput;
+              DataType  := ftString;
+             end;
+        end;
+
+
+         token         := funcoes.geraToken;
+         codigoUsuario := funcoes.trigger;
+
+        try
+           conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+
+         if verificaExistencia(funcoes.RemoveAcento(dados.usuario.email),funcoes.RemoveAcento(dados.empresa.cnpj),conexao) = 409 then
+            begin
+            {usuario existe}
+                   codigoHttp     := 409;
+                   tituloMensagem := 'não foi possivel cadastrar usuário';
+                   mensagem       := 'O usuario já existe';
+
+                   json := '{ '+
+                           '  "mensagemRetorno": {  '+
+                           '   "titulo": "'+ tituloMensagem  +'", '+
+                           '   "mensagem": "'+ mensagem  +'" '+
+                           ' }, '+
+                           ' "dadosRetorno": [], '+
+                           ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                           ' }' ;
+
+                  Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                  freeandnil(query);
+                  FreeAndNil(conexao);
+                  Exit;
+            end;
+
+
+
+         query.Close;
+         query.SQL.Add('SELECT COUNT(*) as total  from USUARIOS');
+         query.Open;
+         codigoIndicacao := query.FieldByName('total').AsString;
+
+
+         query.SQL.Clear;
+         query.SQL.Add
+         ('INSERT INTO USUARIOS('+
+                               'cnpjEmpresa,'+
+                               'razaoEmpresa,'+
+                               'fantasiaEmpresa,'+
+                               'ieEmpresa,'+
+                               'imEmpresa,'+
+                               'cnaeEmpresa,'+
+                               'telefoneEmpresa,'+
+                               'enderecoEmpresa,'+
+                               'numeroEmpresa,'+
+                               'cepEmpresa,'+
+                               'bairroEmpresa,'+
+                               'cidadeEmpresa,'+
+                               'ufEmpresa,'+
+                               'regimeempresa,'+
+                               'segmentoempresa,'+
+                               'codUf,'+
+                               'ibgeMunicipio,'+
+                               'logoEmpresa,'+
+                               'vencimentolicenca,'+
+                               'dataCadastro,'+
+                               'horaCadastro,'+
+                               'tokenUsuario,'+
+                               'emailusuario,'+
+                               'codigoUsuario,'+
+                               'pushtoken,'+
+                               'nomeUsuario,'+
+                               'complementoEmpresa,'+
+                               'celularusuario,'+
+                               'codigoindicacao,'+
+                               'licencaatual,'+
+                               'bloqueado,'+
+                               'idcobranca,'+
+                               'referenciaindicacao,'+
+                               'senhaUsuario)values(');
+
+         query.SQL.Add(''''  +funcoes.somenteNumeros(dados.empresa.cnpj)+ '''');
+         query.SQL.Add(',:RAZAO');
+         query.SQL.Add(',:FANTASIA');
+         query.SQL.Add(',''' +funcoes.somenteNumeros(dados.empresa.inscricaoEstadual)+ '''');
+         query.SQL.Add(',''' +funcoes.somenteNumeros(dados.empresa.inscricaoMunicipal)+ '''');
+         query.SQL.Add(',''' +funcoes.somenteNumeros(dados.empresa.cnae)+ '''');
+         query.SQL.Add(',''' +funcoes.somenteNumeros(dados.empresa.telefone)+'''');
+         query.SQL.Add(',:RUA');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.enderecoEmpresa.numero)+ '''');
+         query.SQL.Add(',''' +funcoes.somenteNumeros(dados.enderecoEmpresa.cep)+ '''');
+         query.SQL.Add(',:BAIRRO');
+         query.SQL.Add(',:CIDADE');
+         query.SQL.Add(',''' +dados.enderecoEmpresa.uf.ToUpper+ '''');
+         query.SQL.Add(',''' +IntToStr(dados.empresa.regime) + '''');
+         query.SQL.Add(',''' +IntToStr(dados.empresa.segmento) +'''');
+         query.SQL.Add(',''' +funcoes.retorna_COD_UF(dados.enderecoEmpresa.uf.ToUpper)+'''');
+         query.SQL.Add(',''' + IntToStr(dados.enderecoEmpresa.codigoCidade) +'''');
+         query.SQL.Add(',''' +''+'''');   //logo//
+         query.SQL.Add(',''' +funcoes.formataData(DateToStr(now+5))+'''');  //dias de licenca
+         query.SQL.Add(',''' +funcoes.formataData(DateToStr(now))+''''); //data do cadastro
+         query.SQL.Add(',''' +timetostr(now)+'''');//hora do cadastro
+         query.SQL.Add(',''' +token+'''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.usuario.email)+'''');
+         query.SQL.Add(',''' +codigoUsuario+'''');
+         query.SQL.Add(',''' +dados.usuario.pushToken+'''');
+         query.SQL.Add(',:USUARIO');
+         query.SQL.Add(',:COMPLEMENTO ');
+         query.SQL.Add(',''' +funcoes.somenteNumeros(dados.usuario.celular)+'''');
+
+         query.SQL.Add(',''' +funcoes.cript('K'+codigoIndicacao+dados.empresa.cnpj[2]+dados.empresa.cnpj[5])+'''');
+         query.SQL.Add(',''' +'Plano Gratuito'+''''); //PLANO ATUAL//
+         query.SQL.Add(',''' +'N'+'''');// COMEÇA COMO NÃO BLOQUEADO//
+         query.SQL.Add(',''' +dados.usuario.codigoCobranca+'''');// CODIGO EXTERNO PARA COBRANCAS//
+         query.SQL.Add(',''' +dados.usuario.codigoIndicador+'''');// CODIGO DE QUEM INDICOU//
+         query.SQL.Add(',''' +funcoes.RemoveAcento(funcoes.cript(funcoes.RemoveAcento(dados.usuario.senha)))+ ''')');
+
+         query.ParamByName('RAZAO').AsString       := dados.empresa.razao;
+         query.ParamByName('FANTASIA').AsString    := dados.empresa.fantasia;
+         query.ParamByName('RUA').AsString         := dados.enderecoEmpresa.endereco;
+         query.ParamByName('BAIRRO').AsString      := dados.enderecoEmpresa.bairro;
+         query.ParamByName('CIDADE').AsString      := dados.enderecoEmpresa.cidade;
+         query.ParamByName('USUARIO').AsString     := dados.usuario.nome;
+         query.ParamByName('COMPLEMENTO').AsString := dados.enderecoEmpresa.Complemento;
+         query.ExecSQL;
+
+         if query.RowsAffected = 1 then
+            begin
+             codigoHttp     := 201;
+             tituloMensagem := 'Usuario caastrado';
+             mensagem       := token;
+            end;
+
+           except
+            on E: Exception do
+             begin
+              codigoHttp     := 500;
+              tituloMensagem := 'Erro interno';
+              mensagem       := funcoes.RemoveAcento(e.Message);
+              funcoes.logErro(e.Message);
+
+
+
+
+             end;
+        end;
+         json := '{ '+
+                 '  "mensagemRetorno": {  '+
+                 '   "titulo": "'+ tituloMensagem  +'", '+
+                 '   "mensagem": "'+ mensagem  +'" '+
+                 ' }, '+
+                 ' "dadosRetorno": [], '+
+                 ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                 ' }' ;
+
+        Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+        freeandnil(query);
+        FreeAndNil(conexao);
+  end;
+
+  {LOGAR}
+  function logar(email,senha:string):TJSONObject;
+var
+   query              : TFDQuery;
+   LJSONArray         : TJSONObject;
+   conexao            : TFDConnection;
+   jsonRetorno        : string;
+   dados              : string;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+        try
+         conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+         query.Close;
+         query.SQL.Add
+         ('SELECT   cnpjEmpresa,'+
+                   'razaoEmpresa,'+
+                   'fantasiaEmpresa,'+
+                   'ieEmpresa,'+
+                   'imEmpresa,'+
+                   'cnaeEmpresa,'+
+
+                   'telefoneEmpresa,'+
+                   'enderecoEmpresa,'+
+                   'complementoEmpresa,'+
+                   'numeroEmpresa,'+
+                   'cepEmpresa,'+
+                   'bairroEmpresa,'+
+                   'cidadeEmpresa,'+
+                   'ufEmpresa,'+
+                   'regimeempresa,'+
+                   'segmentoEmpresa,'+
+                   'codUf,'+
+                   'ibgeMunicipio,'+
+                   'logoEmpresa,'+
+
+                   'nfeserie,'+
+                   'nfenumero,'+
+                   'nfeambiente,'+
+                   'nfeobservacao,'+
+
+                   'quantidadecredito,'+
+                   'saldocredito,'+
+
+                   'nfceserie,'+
+                   'nfcenumero,'+
+                   'nfcecsc,'+
+                   'nfceidcsc,'+
+                   'nfceambiente,'+
+                   'nfceobservacoes,'+
+                   'nfcelargura,'+
+
+                   'contadorNome,'+
+                   'contadoremail,'+
+                   'contadorcnpj,'+
+                   'contadortelefone,'+
+                   'celularusuario,'+
+
+                   'serieCertificado,'+
+                   'validadeCertificado,'+
+
+                   'vencimentolicenca,'+
+                   'licencaatual,'+
+                   'codigoindicacao,'+
+                   'saldoIndicacoes,'+
+                   'pushtoken,'+
+                   'bancoindicacao,'+
+                   'tipocontaindicacao,'+
+                   'agenciabancoindicacao,'+
+                   'contabancoindicacao,'+
+
+                   'tokenUsuario,'+
+                   'emailusuario,'+
+                   'codigoUsuario,'+
+                   'bloqueado,'+
+                   'idcobranca,'+
+                   'nomeUsuario'+
+                   ' FROM usuarios where emailUsuario = '''+email+''' AND senhaUsuario = '''+funcoes.RemoveAcento(funcoes.cript(senha))+'''');
+         query.Open;
+
+         if query.RowsAffected <> 1  then
+              begin
+                   codigoHttp     := 404;
+                   tituloMensagem := 'Erro ao logar';
+                   mensagem       := 'email ou senha incorretos';
+
+                   json := '{ '+
+                           '  "mensagemRetorno": {  '+
+                           '   "titulo": "'+ tituloMensagem  +'", '+
+                           '   "mensagem": "'+ mensagem  +'" '+
+                           ' }, '+
+                           ' "dadosRetorno": [], '+
+                           ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                           ' }' ;
+
+                  Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                  freeandnil(query);
+                  FreeAndNil(conexao);
+                  Exit;
+              end else
+                   begin
+
+                      if query.FieldByName('bloqueado').AsString <> 'N' then  {VERIFICA SE O USUARIO ESTÁ BLOQUEADO}
+                           begin
+                             codigoHttp     := 401;
+                             tituloMensagem := 'Erro ao logar';
+                             mensagem       := 'usuário inativo';
+
+                             json := '{ '+
+                                     '  "mensagemRetorno": {  '+
+                                     '   "titulo": "'+ tituloMensagem  +'", '+
+                                     '   "mensagem": "'+ mensagem  +'" '+
+                                     ' }, '+
+                                     ' "dadosRetorno": [], '+
+                                     ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                                     ' }' ;
+
+                            Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                            freeandnil(query);
+                            FreeAndNil(conexao);
+                            Exit;
+                           end;
+
+                       jsonRetorno  :=
+                                    ' "empresa": { '+
+                                    '   "cnpj": "'+query.FieldByName('cnpjEmpresa').AsString+'", '+
+                                    '   "razao": "'+query.FieldByName('razaoEmpresa').AsString+'", '+
+                                    '   "fantasia": "'+query.FieldByName('fantasiaEmpresa').AsString+'", '+
+                                    '   "inscricaoEstadual": "'+query.FieldByName('ieEmpresa').AsString+'", '+
+                                    '   "inscricaoMunicipal": "'+query.FieldByName('imEmpresa').AsString+'", '+
+                                    '   "cnae": "'+query.FieldByName('cnaeEmpresa').AsString+'", '+
+                                    '   "regime": '+query.FieldByName('regimeempresa').AsString+', '+
+                                    '   "segmento": '+query.FieldByName('segmentoempresa').AsString+', '+
+                                    '   "telefone": "'+query.FieldByName('telefoneempresa').AsString+'", '+
+                                    '   "logo": "'+query.FieldByName('logoempresa').AsString+'"'+
+                                    '  }, '+
+                                    '  "enderecoEmpresa": { '+
+                                    '    "endereco": "'+query.FieldByName('enderecoempresa').AsString+'",'+
+                                    '    "complemento": "'+query.FieldByName('complementoempresa').AsString+'",'+
+                                    '    "numero":  "'+query.FieldByName('numeroempresa').AsString+'",'+
+                                    '    "cep": "'+query.FieldByName('cepempresa').AsString+'",'+
+                                    '    "bairro": "'+query.FieldByName('bairroempresa').AsString+'",'+
+                                    '    "cidade": "'+query.FieldByName('cidadeempresa').AsString+'",'+
+                                    '    "codigoCidade": '+query.FieldByName('ibgemunicipio').AsString+','+
+                                    '    "uf": "'+query.FieldByName('ufempresa').AsString+'"'+
+                                    '  }, '+
+
+                                    '  "usuario": { '+
+                                    '    "nome": "'+query.FieldByName('nomeusuario').AsString+'",'+
+                                    '    "email": "'+query.FieldByName('emailusuario').AsString+'",'+
+                                    '    "token": "'+query.FieldByName('tokenusuario').AsString+'",'+
+                                    '    "codigo": "'+query.FieldByName('codigousuario').AsString+'",'+
+                                    '    "celular": "'+query.FieldByName('celularusuario').AsString+'",'+
+                                    '    "licencaAtual": "'+query.FieldByName('licencaatual').AsString+'",'+
+                                    '    "codigoCobranca": "'+query.FieldByName('idcobranca').AsString+'",'+
+                                    '    "tokenPush": "'+query.FieldByName('pushtoken').AsString+'",'+
+                                    '    "vencimentoLicenca": "'+query.FieldByName('vencimentolicenca').AsString+'"'+
+                                    '  }, '+
+
+                                    '  "creditos": { '+
+                                    '    "valor": "'+query.FieldByName('saldocredito').AsString+'",'+
+                                    '    "quantidadeNotas": "'+query.FieldByName('quantidadecredito').AsString+'"'+
+                                    '  }, '+
+
+                                    '  "indicacao": { '+
+                                    '    "codigoIndicacao": "'+query.FieldByName('codigoindicacao').AsString+'",'+
+                                    '    "saldoIndicacoes": "'+query.FieldByName('saldoIndicacoes').AsString+'",'+
+                                    '     "contaBancaria": { '+
+                                    '       "banco": "'+query.FieldByName('bancoindicacao').AsString+'",'+
+                                    '       "tipo": "'+query.FieldByName('tipocontaindicacao').AsString+'",'+
+                                    '       "agencia": "'+query.FieldByName('agenciabancoindicacao').AsString+'",'+
+                                    '       "conta": "'+query.FieldByName('contabancoindicacao').AsString+'"'+
+                                    '  }'+
+
+                                    '  }, '+
+                                    '  "configuracoes": { '+
+                                    '    "nfe": { '+
+                                    '      "serie": '+query.FieldByName('nfeserie').AsString+','+
+                                    '      "numero": '+query.FieldByName('nfenumero').AsString+','+
+                                    '      "ambiente": '+query.FieldByName('nfeambiente').AsString+','+
+                                    '      "observacoes": "'+query.FieldByName('nfeobservacao').AsString+'"'+
+                                    '  }, '+
+                                    '    "nfce": { '+
+                                    '      "serie": '+query.FieldByName('nfceserie').AsString+','+
+                                    '      "numero": '+query.FieldByName('nfcenumero').AsString+','+
+                                    '      "ambiente": '+query.FieldByName('nfceambiente').AsString+','+
+                                    '      "larguraImpressao": '+query.FieldByName('nfcelargura').AsString+','+
+                                    '      "cscToken": "'+query.FieldByName('nfcecsc').AsString+'",'+
+                                    '      "idCsc": "'+query.FieldByName('nfceidcsc').AsString+'",'+
+                                    '      "observacoes": "'+query.FieldByName('nfceobservacoes').AsString+'"'+
+                                    '  }, '+
+                                    '    "contador": { '+
+                                    '      "nome": "'+query.FieldByName('contadornome').AsString+'",'+
+                                    '      "email": "'+query.FieldByName('contadoremail').AsString+'",'+
+                                    '      "cnpj": "'+query.FieldByName('contadorcnpj').AsString+'",'+
+                                    '      "telefone": "'+query.FieldByName('contadortelefone').AsString+'"'+
+                                    '    }, '+
+                                    '    "certificadoDigital": { '+
+                                    '      "serie": "'+query.FieldByName('seriecertificado').AsString+'",'+
+                                    '      "validade": "'+query.FieldByName('validadecertificado').AsString+'"'+
+                                    '    } '+
+                                    '  }   ';
+
+                     funcoes.faz_log_texto('',jsonRetorno);
+                     codigoHttp     := 200;
+                     dados          := jsonRetorno;
+                   end;
+
+           except
+            on E: Exception do
+             begin
+              codigoHttp     := 500;
+              tituloMensagem := 'Erro interno';
+              mensagem       := funcoes.RemoveAcento(e.Message);
+              funcoes.logErro(e.Message);
+             end;
+        end;
+
+       json          := '{ '+
+       '  "mensagemRetorno": {  '+
+       '   "titulo": "'+ tituloMensagem  +'", '+
+       '   "mensagem": "'+ mensagem +'" '+
+       ' }, '+
+       ' "dadosRetorno": { '+ dados +'}, '+
+       ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+       ' }' ;
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  END;
+
+  {LOGAR COM TOKEN}
+  function logarTOKEN(token:string):TJSONObject;
+var
+   query              : TFDQuery;
+   LJSONArray         : TJSONObject;
+   conexao            : TFDConnection;
+   jsonRetorno        : string;
+   dados              : string;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+        try
+         conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+         query.Close;
+         query.SQL.Add
+         ('SELECT   cnpjEmpresa,'+
+                   'razaoEmpresa,'+
+                   'fantasiaEmpresa,'+
+                   'ieEmpresa,'+
+                   'imEmpresa,'+
+                   'cnaeEmpresa,'+
+
+                   'telefoneEmpresa,'+
+                   'enderecoEmpresa,'+
+                   'complementoEmpresa,'+
+                   'numeroEmpresa,'+
+                   'cepEmpresa,'+
+                   'bairroEmpresa,'+
+                   'cidadeEmpresa,'+
+                   'ufEmpresa,'+
+                   'regimeempresa,'+
+                   'segmentoEmpresa,'+
+                   'codUf,'+
+                   'ibgeMunicipio,'+
+                   'logoEmpresa,'+
+
+                   'nfeserie,'+
+                   'nfenumero,'+
+                   'nfeambiente,'+
+                   'nfeobservacao,'+
+
+                   'quantidadecredito,'+
+                   'saldocredito,'+
+
+
+                   'nfceserie,'+
+                   'nfcenumero,'+
+                   'nfcecsc,'+
+                   'nfceidcsc,'+
+                   'nfceambiente,'+
+                   'nfceobservacoes,'+
+                   'nfcelargura,'+
+
+                   'contadorNome,'+
+                   'contadoremail,'+
+                   'contadorcnpj,'+
+                   'contadortelefone,'+
+                   'celularusuario,'+
+
+                   'serieCertificado,'+
+                   'validadeCertificado,'+
+                   'bancoindicacao,'+
+                   'tipocontaindicacao,'+
+                   'agenciabancoindicacao,'+
+                   'contabancoindicacao,'+
+
+
+                   'vencimentolicenca,'+
+                   'licencaatual,'+
+                   'codigoindicacao,'+
+                   'saldoIndicacoes,'+
+                   'tokenUsuario,'+
+                   'pushtoken,'+
+                   'emailusuario,'+
+                   'codigoUsuario,'+
+                   'idcobranca,'+
+                   'bloqueado,'+
+                   'nomeUsuario'+
+                   ' FROM usuarios where tokenusuario = '''+token+'''');
+         query.Open;
+
+         if query.RowsAffected <> 1  then
+              begin
+                   codigoHttp     := 404;
+                   tituloMensagem := 'Erro ao logar';
+                   mensagem       := 'email ou senha incorretos';
+
+                   json := '{ '+
+                           '  "mensagemRetorno": {  '+
+                           '   "titulo": "'+ tituloMensagem  +'", '+
+                           '   "mensagem": "'+ mensagem  +'" '+
+                           ' }, '+
+                           ' "dadosRetorno": [], '+
+                           ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                           ' }' ;
+
+                  Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                  freeandnil(query);
+                  FreeAndNil(conexao);
+                  Exit;
+              end else
+                   begin
+                          if query.FieldByName('bloqueado').AsString <> 'N' then  {VERIFICA SE O USUARIO ESTÁ BLOQUEADO}
+                           begin
+                             codigoHttp     := 401;
+                             tituloMensagem := 'Erro ao logar';
+                             mensagem       := 'usuário inativo';
+
+                             json := '{ '+
+                                     '  "mensagemRetorno": {  '+
+                                     '   "titulo": "'+ tituloMensagem  +'", '+
+                                     '   "mensagem": "'+ mensagem  +'" '+
+                                     ' }, '+
+                                     ' "dadosRetorno": [], '+
+                                     ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                                     ' }' ;
+
+                            Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                            freeandnil(query);
+                            FreeAndNil(conexao);
+                            Exit;
+                           end;
+
+                                             jsonRetorno  :=
+                                    ' "empresa": { '+
+                                    '   "cnpj": "'+query.FieldByName('cnpjEmpresa').AsString+'", '+
+                                    '   "razao": "'+query.FieldByName('razaoEmpresa').AsString+'", '+
+                                    '   "fantasia": "'+query.FieldByName('fantasiaEmpresa').AsString+'", '+
+                                    '   "inscricaoEstadual": "'+query.FieldByName('ieEmpresa').AsString+'", '+
+                                    '   "inscricaoMunicipal": "'+query.FieldByName('imEmpresa').AsString+'", '+
+                                    '   "cnae": "'+query.FieldByName('cnaeEmpresa').AsString+'", '+
+                                    '   "regime": '+query.FieldByName('regimeempresa').AsString+', '+
+                                    '   "segmento": '+query.FieldByName('segmentoempresa').AsString+', '+
+                                    '   "telefone": "'+query.FieldByName('telefoneempresa').AsString+'", '+
+                                    '   "logo": "'+query.FieldByName('logoempresa').AsString+'"'+
+                                    '  }, '+
+                                    '  "enderecoEmpresa": { '+
+                                    '    "endereco": "'+query.FieldByName('enderecoempresa').AsString+'",'+
+                                    '    "complemento": "'+query.FieldByName('complementoempresa').AsString+'",'+
+                                    '    "numero":  "'+query.FieldByName('numeroempresa').AsString+'",'+
+                                    '    "cep": "'+query.FieldByName('cepempresa').AsString+'",'+
+                                    '    "bairro": "'+query.FieldByName('bairroempresa').AsString+'",'+
+                                    '    "cidade": "'+query.FieldByName('cidadeempresa').AsString+'",'+
+                                    '    "codigoCidade": '+query.FieldByName('ibgemunicipio').AsString+','+
+                                    '    "uf": "'+query.FieldByName('ufempresa').AsString+'"'+
+                                    '  }, '+
+                                    '  "usuario": { '+
+                                    '    "nome": "'+query.FieldByName('nomeusuario').AsString+'",'+
+                                    '    "email": "'+query.FieldByName('emailusuario').AsString+'",'+
+                                    '    "token": "'+query.FieldByName('tokenusuario').AsString+'",'+
+                                    '    "codigo": "'+query.FieldByName('codigousuario').AsString+'",'+
+                                    '    "celular": "'+query.FieldByName('celularusuario').AsString+'",'+
+                                    '    "licencaAtual": "'+query.FieldByName('licencaatual').AsString+'",'+
+                                    '    "codigoCobranca": "'+query.FieldByName('idcobranca').AsString+'",'+
+                                    '    "tokenPush": "'+query.FieldByName('pushtoken').AsString+'",'+
+                                    '    "vencimentoLicenca": "'+query.FieldByName('vencimentolicenca').AsString+'"'+
+                                    '  }, '+
+                                    '  "creditos": { '+
+                                    '    "valor": "'+query.FieldByName('saldocredito').AsString+'",'+
+                                    '    "quantidadeNotas": "'+query.FieldByName('quantidadecredito').AsString+'"'+
+                                    '  }, '+
+                                    '  "indicacao": { '+
+                                    '    "codigoIndicacao": "'+query.FieldByName('codigoindicacao').AsString+'",'+
+                                    '    "saldoIndicacoes": "'+query.FieldByName('saldoIndicacoes').AsString+'",'+
+                                    '     "contaBancaria": { '+
+                                    '       "banco": "'+query.FieldByName('bancoindicacao').AsString+'",'+
+                                    '       "tipo": "'+query.FieldByName('tipocontaindicacao').AsString+'",'+
+                                    '       "agencia": "'+query.FieldByName('agenciabancoindicacao').AsString+'",'+
+                                    '       "conta": "'+query.FieldByName('contabancoindicacao').AsString+'"'+
+                                    '  }'+
+                                    '  }, '+
+                                    '  "configuracoes": { '+
+                                    '    "nfe": { '+
+                                    '      "serie": '+query.FieldByName('nfeserie').AsString+','+
+                                    '      "numero": '+query.FieldByName('nfenumero').AsString+','+
+                                    '      "ambiente": '+query.FieldByName('nfeambiente').AsString+','+
+                                    '      "observacoes": "'+query.FieldByName('nfeobservacao').AsString+'"'+
+                                    '  }, '+
+                                    '    "nfce": { '+
+                                    '      "serie": '+query.FieldByName('nfceserie').AsString+','+
+                                    '      "numero": '+query.FieldByName('nfcenumero').AsString+','+
+                                    '      "ambiente": '+query.FieldByName('nfceambiente').AsString+','+
+                                    '      "larguraImpressao": '+query.FieldByName('nfcelargura').AsString+','+
+                                    '      "cscToken": "'+query.FieldByName('nfcecsc').AsString+'",'+
+                                    '      "idCsc": "'+query.FieldByName('nfceidcsc').AsString+'",'+
+                                    '      "observacoes": "'+query.FieldByName('nfceobservacoes').AsString+'"'+
+                                    '  }, '+
+                                    '    "contador": { '+
+                                    '      "nome": "'+query.FieldByName('contadornome').AsString+'",'+
+                                    '      "email": "'+query.FieldByName('contadoremail').AsString+'",'+
+                                    '      "cnpj": "'+query.FieldByName('contadorcnpj').AsString+'",'+
+                                    '      "telefone": "'+query.FieldByName('contadortelefone').AsString+'"'+
+                                    '    }, '+
+                                    '    "certificadoDigital": { '+
+                                    '      "serie": "'+query.FieldByName('seriecertificado').AsString+'",'+
+                                    '      "validade": "'+query.FieldByName('validadecertificado').AsString+'"'+
+                                    '    } '+
+                                    '  }   ';
+
+
+                     codigoHttp     := 200;
+                     dados          := jsonRetorno;
+                   end;
+
+           except
+            on E: Exception do
+             begin
+              codigoHttp     := 500;
+              tituloMensagem := 'Erro interno';
+              mensagem       := funcoes.RemoveAcento(e.Message);
+              funcoes.logErro(e.Message);
+             end;
+        end;
+
+       json          := '{ '+
+       '  "mensagemRetorno": {  '+
+       '   "titulo": "'+ tituloMensagem  +'", '+
+       '   "mensagem": "'+ mensagem +'" '+
+       ' }, '+
+       ' "dadosRetorno": { '+ dados +'}, '+
+       ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+       ' }' ;
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  END;
+
+  {ALTERAR EMPRESA}
+  function alteraEmpresa(dados:parametros.alteraEmpresa;cod_usuario:string):TJSONObject;
+    var
+   query              : TFDQuery;
+   LJSONArray         : TJSONObject;
+   conexao            : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+
+        try
+         conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+
+               with query.Params do
+            begin
+                with Add do
+                 begin
+                  Name      := 'FANTASIA';
+                  ParamType := ptInput;
+                  DataType  := ftString;
+
+                  Name      := 'RAZAO';
+                  ParamType := ptInput;
+                  DataType  := ftString;
+
+                  Name      := 'RUA';
+                  ParamType := ptInput;
+                  DataType  := ftString;
+
+                  Name      := 'BAIRRO';
+                  ParamType := ptInput;
+                  DataType  := ftString;
+
+                  Name      := 'CIDADE';
+                  ParamType := ptInput;
+                  DataType  := ftString;
+
+                  Name      := 'COMPLEMENTO';
+                  ParamType := ptInput;
+                  DataType  := ftString;
+                 end;
+            end;
+
+         query.SQL.Add('UPDATE usuarios set cnpjEmpresa ='''+funcoes.somenteNumeros(dados.empresa.cnpj)+'''');
+         query.SQL.Add(',razaoEmpresa = :RAZAO');
+         query.SQL.Add(',fantasiaEmpresa = :FANTASIA');
+         query.SQL.Add(',ieEmpresa='''+funcoes.somenteNumeros(dados.empresa.inscricaoEstadual)+'''');
+         query.SQL.Add(',imEmpresa='''+funcoes.somenteNumeros(dados.empresa.inscricaoMunicipal)+'''');
+         query.SQL.Add(',cnaeEmpresa='''+funcoes.somenteNumeros(dados.empresa.cnae)+'''');
+         query.SQL.Add(',segmentoempresa='''+IntToStr(dados.empresa.segmento)+'''');
+         query.SQL.Add(',regimeempresa='''+IntToStr(dados.empresa.regime)+'''');
+         query.SQL.Add(',telefoneEmpresa='''+funcoes.somenteNumeros(dados.empresa.telefone)+'''');
+
+         query.SQL.Add(',enderecoempresa = :RUA');
+         query.SQL.Add(',complementoempresa = :COMPLEMENTO');
+         query.SQL.Add(',cepempresa='''+funcoes.somenteNumeros(dados.enderecoEmpresa.cep)+'''');
+         query.SQL.Add(',bairroempresa = :BAIRRO');
+         query.SQL.Add(',cidadeempresa = :CIDADE');
+         query.SQL.Add(',coduf='''+funcoes.retorna_COD_UF(dados.enderecoEmpresa.uf.ToUpper)+'''');
+         query.SQL.Add(',ufempresa='''+dados.enderecoEmpresa.uf.ToUpper+'''');
+         query.SQL.Add(',ibgemunicipio='''+IntToStr(dados.enderecoEmpresa.codigoCidade) +'''');
+         query.SQL.Add(' WHERE codigousuario = '''+cod_usuario+'''');
+
+         query.ParamByName('FANTASIA').Value      := dados.empresa.fantasia;
+         query.ParamByName('RAZAO').Value         := dados.empresa.razao;
+         query.ParamByName('RUA').Value           := dados.enderecoEmpresa.endereco;
+         query.ParamByName('COMPLEMENTO').Value   := dados.enderecoEmpresa.complemento;
+         query.ParamByName('BAIRRO').Value        := dados.enderecoEmpresa.bairro;
+         query.ParamByName('CIDADE').Value        := dados.enderecoEmpresa.cidade;
+
+         query.ExecSQL;
+
+         if query.RowsAffected = 1 then
+            begin
+             tituloMensagem := 'Tudo certo';
+             mensagem       := 'Empresa atualizada';
+             codigoHttp     :=  200;
+            end else
+                 begin
+                   tituloMensagem := 'Oops';
+                   mensagem       := 'empresa não alterada';
+                   codigoHttp     :=  404;
+                 end;
+
+           except
+            on E: Exception do
+             begin
+              tituloMensagem := 'Erro interno';
+              mensagem       :=  funcoes.RemoveAcento(e.Message);
+              codigoHttp     :=  500;
+              funcoes.logErro(e.Message);
+             end;
+        end;
+
+       json          := '{ '+
+       '  "mensagemRetorno": {  '+
+       '   "titulo": "'+ tituloMensagem  +'", '+
+       '   "mensagem": "'+ mensagem +'" '+
+       ' }, '+
+       ' "dadosRetorno": [], '+
+       ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+       ' }' ;
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+  {ATUALIZA CERTIFICADO DIGITAL}
+  function atualizaCertificado(cod_usuario,base64:widestring;senha:string):TJSONObject;
+   var
+   query               : TFDQuery;
+   arquivo             : TBytesStream;
+   conexao             : TFDConnection;
+   codigoHttp          : integer;
+   mensagem            : string;
+   tituloMensagem      : string;
+   json                : string;
+   certificado         : TACBrNFe;
+  begin
+     conexao           := TFDConnection.Create(nil);
+     query             := TFDQuery.Create(nil);
+     query.Connection  := conexao;
+     certificado       := TACBrNFe.Create(nil);
+     arquivo           := TBytesStream.Create(DecodeBase64(base64));
+        try
+         arquivo.SaveToFile('.\certificados\'+cod_usuario+'.pfx');
+         certificado.Configuracoes.Geral.SSLLib                     := tSSLLib.libWinCrypt;
+         certificado.SSL.SSLType                                    := tSSLType.LT_TLSv1_2;
+         certificado.Configuracoes.Certificados.ArquivoPFX          := '.\certificados\'+cod_usuario+'.pfx';
+         certificado.Configuracoes.Certificados.Senha               := senha;
+
+         if  certificado.SSL.CertDataVenc < now then
+             begin
+                   codigoHttp     := 400;
+                   tituloMensagem := 'Não foi possivel inserir certificado';
+                   mensagem       := 'Certificado digital vencido';
+
+                   json := '{ '+
+                           '  "mensagemRetorno": {  '+
+                           '   "titulo": "'+ tituloMensagem  +'", '+
+                           '   "mensagem": "'+ mensagem  +'" '+
+                           ' }, '+
+                           ' "dadosRetorno": [], '+
+                           ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                           ' }' ;
+
+                  DeleteFile('.\certificados\'+cod_usuario+'.pfx');
+                  DeleteFile('.\certificados\'+cod_usuario+'.txt');
+
+                  conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+                  query.SQL.Add('UPDATE usuarios set certificadosenha ='''+funcoes.RemoveAcento(funcoes.cript(senha))+'''');
+                  query.SQL.Add(',serieCertificado ='''+''+'''');
+                  query.SQL.Add(',validadeCertificado ='''+''+'''');
+                  query.SQL.Add(' WHERE codigousuario = '''+cod_usuario+'''');
+                  query.ExecSQL;
+
+                  Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                  freeandnil(query);
+                  FreeAndNil(conexao);
+                  FreeAndNil(arquivo);
+                  FreeAndNil(certificado);
+                  Exit;
+             end;
+
+
+
+             conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+             query.Close;
+             query.SQL.Add('SELECT cnpjempresa from usuarios where codigousuario ='''+cod_usuario+'''');
+             query.Open;
+
+         if query.FieldByName('cnpjempresa').AsString <> certificado.SSL.CertCNPJ then
+            begin
+                   codigoHttp     := 400;
+                   tituloMensagem := 'Não foi possivel inserir certificado';
+                   mensagem       := 'O Certificado digital é diferente do CNPJ do usuário';
+
+                   json := '{ '+
+                           '  "mensagemRetorno": {  '+
+                           '   "titulo": "'+ tituloMensagem  +'", '+
+                           '   "mensagem": "'+ mensagem  +'" '+
+                           ' }, '+
+                           ' "dadosRetorno": [], '+
+                           ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                           ' }' ;
+
+                  DeleteFile('.\certificados\'+cod_usuario+'.pfx');
+                  DeleteFile('.\certificados\'+cod_usuario+'.txt');
+
+                  query.SQL.Clear;
+                  query.SQL.Add('UPDATE usuarios set certificadosenha ='''+funcoes.RemoveAcento(funcoes.cript(senha))+'''');
+                  query.SQL.Add(',serieCertificado ='''+''+'''');
+                  query.SQL.Add(',validadeCertificado ='''+''+'''');
+                  query.SQL.Add(' WHERE codigousuario = '''+cod_usuario+'''');
+                  query.ExecSQL;
+
+                  Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                  freeandnil(query);
+                  FreeAndNil(conexao);
+                  FreeAndNil(arquivo);
+                  FreeAndNil(certificado);
+                  Exit;
+            end else
+                 begin
+                   query.SQL.Clear;
+                   query.SQL.Add('UPDATE usuarios set certificadosenha ='''+funcoes.RemoveAcento(funcoes.cript(senha))+'''');
+                   query.SQL.Add(',serieCertificado ='''+ certificado.SSL.CertNumeroSerie+'''');
+                   query.SQL.Add(',validadeCertificado ='''+DateToStr(certificado.SSL.CertDataVenc)+'''');
+                   query.SQL.Add(' WHERE codigousuario = '''+cod_usuario+'''');
+                   query.ExecSQL;
+
+                   if query.RowsAffected = 1 then
+                      begin
+                        codigoHttp     := 200;
+                        tituloMensagem := 'Tudo certo';
+                        mensagem       := 'Certificado digital inserido';
+
+                        json := '{ '+
+                                '  "mensagemRetorno": {  '+
+                                '   "serie": "'+ certificado.SSL.CertNumeroSerie+'", '+
+                                '   "validade": "'+ DateToStr(certificado.SSL.CertDataVenc) +'" '+
+                                ' }, '+
+                                ' "dadosRetorno": [], '+
+                                ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                                ' }' ;
+
+                        Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                      end;
+                 end;
+
+           except
+            on E: Exception do
+             begin
+                   codigoHttp     := 500;
+                   tituloMensagem := 'Erro interno';
+                   mensagem       :=  funcoes.RemoveAcento(e.Message);
+
+                   json := '{ '+
+                           '  "mensagemRetorno": {  '+
+                           '   "titulo": "'+ tituloMensagem  +'", '+
+                           '   "mensagem": "'+ mensagem  +'" '+
+                           ' }, '+
+                           ' "dadosRetorno": [], '+
+                           ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                           ' }' ;
+
+                  Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                  DeleteFile('.\certificados\'+cod_usuario+'.pfx');
+                  DeleteFile('.\certificados\'+cod_usuario+'.txt');
+
+             end;
+        end;
+      freeandnil(query);
+      FreeAndNil(conexao);
+      FreeAndNil(arquivo);
+      FreeAndNil(certificado);
+  END;
+
+  {REMOVER CERTIFICADO DIGITAL}
+  function removerCertificado(cod_usuario:string):TJSONObject;
+   var
+    query               : TFDQuery;
+    conexao             : TFDConnection;
+    codigoHttp          : integer;
+    mensagem            : string;
+    tituloMensagem      : string;
+    json                : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+        try
+          if (DeleteFile('.\certificados\'+cod_usuario+'.pfx')) then
+             begin
+               conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+               query.SQL.Add('UPDATE usuarios set certificadosenha ='''+''+'''');
+               query.SQL.Add(',serieCertificado ='''+ ''+'''');
+               query.SQL.Add(',validadeCertificado ='''+''+'''');
+               query.SQL.Add(' WHERE codigousuario = '''+cod_usuario+'''');
+               query.ExecSQL;
+
+               if query.RowsAffected = 1 then
+                  begin
+                   tituloMensagem := 'Tudo certo';
+                   mensagem       := 'certificado removido';
+                   codigoHttp     :=  200;
+                  end
+             end else
+                  begin
+                    tituloMensagem := 'não foi possivel remover';
+                    mensagem       := 'certificado não existe';
+                    codigoHttp     :=  404;
+                  end;
+
+           except
+            on E: Exception do
+             begin
+              tituloMensagem := 'Erro interno';
+              mensagem       :=  funcoes.RemoveAcento(e.Message);
+              codigoHttp     :=  500;
+              funcoes.logErro(e.Message);
+             end;
+        end;
+
+       json          := '{ '+
+       '  "mensagemRetorno": {  '+
+       '   "titulo": "'+ tituloMensagem  +'", '+
+       '   "mensagem": "'+ mensagem +'" '+
+       ' }, '+
+       ' "dadosRetorno": [], '+
+       ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+       ' }' ;
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+  {ATUALIZAR LOGO}
+  function atualizaLogo(cod_usuario,base64:widestring):TJSONObject;
+   var
+   query              : TFDQuery;
+   conexao            : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+       try
+                conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+                query.SQL.Add('UPDATE usuarios SET logoempresa =:logo WHERE codigousuario = '''+cod_usuario+'''');
+                query.Params[0].DataType := ftBlob;
+                query.Params[0].Value    := base64;
+
+                query.ExecSQL;
+
+                 if query.RowsAffected = 1 then
+                     begin
+                      tituloMensagem := 'Tudo ok';
+                      mensagem       := 'Logo atualizada';
+                      codigoHttp     :=  200;
+                     end;
+
+             except
+              on E: Exception do
+               begin
+                tituloMensagem := 'Erro interno';
+                mensagem       := funcoes.RemoveAcento(e.Message);
+                codigoHttp     := 500;
+                funcoes.logErro(e.Message);
+               end;
+       end;
+
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": [], '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+    Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+    freeandnil(query);
+    FreeAndNil(conexao);
+  end;
+
+  {REMOVER LOGO}
+  function removerLogo(cod_usuario:string):TJSONObject;
+   var
+   query              : TFDQuery;
+   conexao            : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+       try
+                conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+                query.SQL.Add('UPDATE usuarios SET logoempresa =:logo WHERE codigousuario = '''+cod_usuario+'''');
+                query.Params[0].DataType := ftBlob;
+                query.Params[0].Value    := '';
+
+                query.ExecSQL;
+
+                 if query.RowsAffected = 1 then
+                     begin
+                      tituloMensagem := 'Tudo ok';
+                      mensagem       := 'Logo removida';
+                      codigoHttp     :=  200;
+                     end;
+
+             except
+              on E: Exception do
+               begin
+                tituloMensagem := 'Erro interno';
+                mensagem       := funcoes.RemoveAcento(e.Message);
+                codigoHttp     := 500;
+                funcoes.logErro(e.Message);
+               end;
+       end;
+
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": [], '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+    Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+    freeandnil(query);
+    FreeAndNil(conexao);
+  END;
+
+  {VERIFICA EXISTENCIA VIA API}
+  function verificaExistenciaAPI(login,cnpj:string):TJSONObject;
+var
+  query              : TFDQuery;
+  conexao            : TFDConnection;
+  texto              : string;
+  dados              : string;
+  json               : string;
+  codigoHttp         : integer;
+  mensagem           : string;
+  tituloMensagem     : string;
+  begin
+       conexao          := TFDConnection.Create(nil);
+       query            := TFDQuery.Create(nil);
+       query.Connection := conexao;
+
+     if (login <> '') and (cnpj <> '') then
+         begin
+           texto := 'SELECT count(*) as total FROM USUARIOS WHERE emailusuario=''' + login + ''' or cnpjEmpresa = '''+cnpj+'''';
+         end;
+
+     if (login = '') and (cnpj <> '')  then
+          begin
+           texto := 'SELECT count(*) as total FROM USUARIOS WHERE cnpjEmpresa=''' + cnpj + '''';
+          end;
+
+     if (login <> '') and (cnpj = '')  then
+          begin
+           texto := 'SELECT count(*) as total FROM USUARIOS WHERE emailusuario=''' +login+ '''';
+          end;
+
+
+
+    TRY
+     conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+     query.Close;
+     query.SQL.Add(texto);
+     query.Open;
+
+      if  query.FieldByName('total').AsInteger >0 then
+           begin
+              codigoHttp     := 409;
+              tituloMensagem := 'Opps';
+              mensagem       := 'Esse usuario já existe';
+           end else
+               begin
+
+                  codigoHttp     := 200;
+                  tituloMensagem := 'Tudo certo';
+                  mensagem       := 'Usuário apto para cadastro';
+
+               end;
+
+             except
+              on E: Exception do
+               begin
+                  codigoHttp     := 500;
+                  tituloMensagem := 'Erro interno';
+                  mensagem       :=  funcoes.RemoveAcento(e.Message);
+               end;
+    END;
+           json := '{ '+
+                   '  "mensagemRetorno": {  '+
+                   '   "titulo": "'+ tituloMensagem  +'", '+
+                   '   "mensagem": "'+ mensagem  +'" '+
+                   ' }, '+
+                   ' "dadosRetorno": [], '+
+                   ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                   ' }' ;
+
+          Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+          freeandnil(query);
+          FreeAndNil(conexao);
+          Exit;
+  end;
+
+  {ALTERAR SENHA}
+  function alteraSenha(senhaAntiga,novaSenha,cod_usuario:string):TJSONObject;
+    var
+   query              : TFDQuery;
+   LJSONArray         : TJSONObject;
+   conexao            : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+   novo_token         : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+        try
+         conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+
+         //VERIFICA SE A SENHA DIGITADA É A CORRETA///
+         query.Close;
+         query.SQL.Add('SELECT senhausuario as senha from usuarios where codigousuario = '''+cod_usuario+'''');
+         query.Open();
+
+         if query.FieldByName('senha').AsString <>  funcoes.RemoveAcento(funcoes.cript(senhaAntiga))  then
+            begin
+               codigoHttp     := 400;
+               tituloMensagem := 'Não foi alterar senha';
+               mensagem       := 'a senha informada está incorreta';
+
+               json := '{ '+
+                       '  "mensagemRetorno": {  '+
+                       '   "titulo": "'+ tituloMensagem  +'", '+
+                       '   "mensagem": "'+ mensagem  +'" '+
+                       ' }, '+
+                       ' "dadosRetorno": [], '+
+                       ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                       ' }' ;
+
+              Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+              freeandnil(query);
+              FreeAndNil(conexao);
+              Exit;
+            end;
+
+         query.SQL.Clear;
+         novo_token    := funcoes.geraToken;
+
+         query.SQL.Add('UPDATE usuarios set senhausuario ='''+funcoes.RemoveAcento(funcoes.cript(novaSenha))+'''');
+         query.SQL.Add(',tokenusuario = '''+novo_token+'''');
+         query.SQL.Add(' WHERE codigousuario = '''+cod_usuario+'''');
+         query.ExecSQL;
+
+         if query.RowsAffected = 1 then
+            begin
+             tituloMensagem := 'senha alterada';
+             mensagem       := novo_token;
+             codigoHttp     :=  200;
+            end else
+                 begin
+                   tituloMensagem := 'Oops';
+                   mensagem       := 'usuario não encontrado ';
+                   codigoHttp     :=  404;
+                 end;
+
+           except
+            on E: Exception do
+             begin
+              tituloMensagem := 'Erro interno';
+              mensagem       :=  funcoes.RemoveAcento(e.Message);
+              codigoHttp     :=  500;
+              funcoes.logErro(e.Message);
+             end;
+        end;
+
+       json          := '{ '+
+       '  "mensagemRetorno": {  '+
+       '   "titulo": "'+ tituloMensagem  +'", '+
+       '   "mensagem": "'+ mensagem +'" '+
+       ' }, '+
+       ' "dadosRetorno": [], '+
+       ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+       ' }' ;
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  END;
+
+  {NOVA VENDA}
+  function novaVenda(cod_usuario:string;dados:parametros.venda):TJSONObject;
+  var
+   query          : TFDQuery;
+   conexao        : TFDConnection;
+   codigo         : string;
+   json           : string;
+   codigoHttp     : integer;
+   mensagem       : string;
+   tituloMensagem : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+     codigo           := funcoes.trigger;
+
+        try
+         conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+         query.SQL.Add
+         ('INSERT INTO vendas_usuarios (idVenda,'+
+                                 'codigoCobranca,'+
+                                 'urlFatura,'+
+                                 'plano,'+
+                                 'valor,'+
+                                 'vencimento_venda,'+
+                                 'data_venda,'+
+                                 'hora_venda,'+
+                                 'status_venda,'+
+                                 'dias_vencimento,'+
+                                 'vencimentoplano,'+
+                                 'cod_usuario)values(');
+         query.SQL.Add(''''  +codigo+'''');
+         query.SQL.Add(',''' +dados.codigoCobranca + '''');
+         query.SQL.Add(',''' +dados.urlFatura+ '''');
+         query.SQL.Add(',''' +funcoes.RemoveAcento(dados.descricaoPlano)+'''');
+         query.SQL.Add(',''' +funcoes.TrocaVirgPPto(CurrToStr(dados.valor))+'''');
+         query.SQL.Add(',''' +funcoes.formataData(DateToStr(dados.vencimentoCobranca))+'''');
+         query.SQL.Add(',''' +funcoes.formataData(DateToStr(now))+ '''');
+         query.SQL.Add(',''' +TimeToStr(now) + '''');
+         query.SQL.Add(',''' +dados.statusVenda+ '''');
+         query.SQL.Add(',''' +inttostr(dados.diasVencimento)+ '''');
+         query.SQL.Add(',''' +funcoes.formataData(DateToStr(NOW+dados.diasVencimento))+ '''');
+         query.SQL.Add(',''' +cod_usuario+ ''')');
+         query.ExecSQL;
+
+         if query.RowsAffected = 1 then
+            begin
+             tituloMensagem := 'venda realizada';
+             mensagem       := codigo;
+             codigoHttp     := 201;
+            end;
+
+           except
+            on E: Exception do
+             begin
+               tituloMensagem := 'Erro interno';
+               mensagem       := funcoes.RemoveAcento(e.Message);
+               codigoHttp     := 500;
+               funcoes.logErro(e.Message);
+             end;
+        end;
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": [], '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+    Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+    freeandnil(query);
+    FreeAndNil(conexao);
+  end;
+
+  {CONSULTA HISTORICO DE VENDAS}
+  function historicoVendas(cod_usuario:string;pagina,registros:Integer):TJSONObject;
+   var
+   query          : TFDQuery;
+   LJSONArray     : TJSONArray;
+   conexao        : TFDConnection;
+   dados          : string;
+   json           : string;
+   codigoHttp     : integer;
+   mensagem       : string;
+   tituloMensagem : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+          try
+             conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+             query.Close;
+             query.SQL.Add(' SELECT '+
+                           ' idvenda'+
+                           ',codigocobranca'+
+                           ',urlfatura'+
+                           ',plano'+
+                           ',valor'+
+                           ',vencimento_venda'+
+                           ',data_venda'+
+                           ',status_venda'+
+                           ',plano'+
+                           ' FROM vendas_usuarios where  vencimento_venda >=  CURRENT_DATE   and   data_venda  BETWEEN CURRENT_DATE -7  AND CURRENT_DATE  and cod_usuario='''+cod_usuario+'''  ORDER BY data_venda desc  LIMIT '+IntToStr(registros)+' OFFSET '+IntToStr((pagina-1) * registros)+'  ');
+
+
+             funcoes.faz_log_texto('',query.SQL.Text);
+             query.Open;
+
+               if  query.RowsAffected = 0  then
+                  begin
+                     codigoHttp      := 404;
+                     tituloMensagem  := 'nenhuma informação';
+                     mensagem        := 'nenhuma venda encontrada';
+                  end else
+                       begin
+                          codigoHttp := 200;
+                          LJSONArray            := query.ToJSONArray;
+                          dados := '"vendas":'+ LJSONArray.Format;
+                          LJSONArray.Free;
+                       end;
+
+             except
+              on E: Exception do
+               begin
+                tituloMensagem := 'Erro interno';
+                mensagem       := funcoes.RemoveAcento(e.Message);
+                codigoHttp     := 500;
+                funcoes.logErro(e.Message);
+               end;
+          end;
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": { '+ dados +'}, '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+  {ATUALIZA CONTADOR}
+  function atualizaContador(cod_usuario,email:string;cnpj:string;nome:string;telefone:string):TJSONObject;
+    var
+   query              : TFDQuery;
+   LJSONArray         : TJSONObject;
+   conexao            : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+        try
+         conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+
+         query.SQL.Add('UPDATE usuarios set contadornome ='''+funcoes.RemoveAcento(nome)+'''');
+         query.SQL.Add(',contadoremail='''+funcoes.RemoveAcento(email)+'''');
+         query.SQL.Add(',contadorcnpj='''+funcoes.somenteNumeros(cnpj)+'''');
+         query.SQL.Add(',contadortelefone='''+telefone+'''');
+         query.SQL.Add(' WHERE codigousuario = '''+cod_usuario+'''');
+         query.ExecSQL;
+
+         if query.RowsAffected = 1 then
+            begin
+             tituloMensagem := 'Tudo certo';
+             mensagem       := 'Contador atualizado';
+             codigoHttp     :=  200;
+            end else
+                 begin
+                   tituloMensagem := 'Oops';
+                   mensagem       := 'Contador não atuaqlizado';
+                   codigoHttp     :=  404;
+                 end;
+
+           except
+            on E: Exception do
+             begin
+              tituloMensagem := 'Erro interno';
+              mensagem       :=  funcoes.RemoveAcento(e.Message);
+              codigoHttp     :=  500;
+              funcoes.logErro(e.Message);
+             end;
+        end;
+
+       json          := '{ '+
+       '  "mensagemRetorno": {  '+
+       '   "titulo": "'+ tituloMensagem  +'", '+
+       '   "mensagem": "'+ mensagem +'" '+
+       ' }, '+
+       ' "dadosRetorno": [], '+
+       ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+       ' }' ;
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+  {ATUALIZA NFCE}
+  function atualizaNfce(cod_usuario:string;serie,numero,ambiente,largura:int64;csc:string;Idcsc:string;observacoes:string):TJSONObject;
+    var
+   query              : TFDQuery;
+   LJSONArray         : TJSONObject;
+   conexao            : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+        try
+         conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+         query.SQL.Add('UPDATE usuarios set nfceserie ='''+funcoes.somenteNumeros(IntToStr(serie))+'''');
+         query.SQL.Add(',nfcenumero='''+funcoes.somenteNumeros(IntToStr(numero))+'''');
+         query.SQL.Add(',nfcecsc='''+csc+'''');
+         query.SQL.Add(',nfceidcsc='''+Idcsc+'''');
+         query.SQL.Add(',nfceambiente='''+funcoes.somenteNumeros(IntToStr(ambiente))+'''');
+         query.SQL.Add(',nfceobservacoes='''+funcoes.RemoveAcento(observacoes).ToUpper+'''');
+         query.SQL.Add(',nfcelargura='''+IntToStr(largura)+'''');
+         query.SQL.Add(' WHERE codigousuario = '''+cod_usuario+'''');
+         query.ExecSQL;
+
+         if query.RowsAffected = 1 then
+            begin
+             tituloMensagem := 'Tudo certo';
+             mensagem       := 'NFC-e atualizado';
+             codigoHttp     :=  200;
+            end else
+                 begin
+                   tituloMensagem := 'Oops';
+                   mensagem       := 'NFC-e atualizado não atuaqlizado';
+                   codigoHttp     :=  404;
+                 end;
+
+           except
+            on E: Exception do
+             begin
+              tituloMensagem := 'Erro interno';
+              mensagem       :=  funcoes.RemoveAcento(e.Message);
+              codigoHttp     :=  500;
+              funcoes.logErro(e.Message);
+             end;
+        end;
+
+       json          := '{ '+
+       '  "mensagemRetorno": {  '+
+       '   "titulo": "'+ tituloMensagem  +'", '+
+       '   "mensagem": "'+ mensagem +'" '+
+       ' }, '+
+       ' "dadosRetorno": [], '+
+       ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+       ' }' ;
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+  {ATUALIZA NFE}
+  function atualizaNfe(cod_usuario:string;serie,numero,ambiente:int64;observacoes:string):TJSONObject;
+    var
+   query              : TFDQuery;
+   LJSONArray         : TJSONObject;
+   conexao            : TFDConnection;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+        try
+         conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+         query.SQL.Add('UPDATE usuarios set nfeserie ='''+funcoes.somenteNumeros(IntToStr(serie))+'''');
+         query.SQL.Add(',nfenumero='''+funcoes.somenteNumeros(IntToStr(numero))+'''');
+         query.SQL.Add(',nfeambiente='''+funcoes.somenteNumeros(IntToStr(ambiente))+'''');
+         query.SQL.Add(',nfeobservacao='''+funcoes.RemoveAcento(observacoes).ToUpper+'''');
+         query.SQL.Add(' WHERE codigousuario = '''+cod_usuario+'''');
+         query.ExecSQL;
+
+         if query.RowsAffected = 1 then
+            begin
+             tituloMensagem := 'Tudo certo';
+             mensagem       := 'NF-e atualizado';
+             codigoHttp     :=  200;
+            end else
+                 begin
+                   tituloMensagem := 'Oops';
+                   mensagem       := 'NFCe atualizado não atuaqlizado';
+                   codigoHttp     :=  404;
+                 end;
+
+           except
+            on E: Exception do
+             begin
+              tituloMensagem := 'Erro interno';
+              mensagem       :=  funcoes.RemoveAcento(e.Message);
+              codigoHttp     :=  500;
+              funcoes.logErro(e.Message);
+             end;
+        end;
+
+       json          := '{ '+
+       '  "mensagemRetorno": {  '+
+       '   "titulo": "'+ tituloMensagem  +'", '+
+       '   "mensagem": "'+ mensagem +'" '+
+       ' }, '+
+       ' "dadosRetorno": [], '+
+       ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+       ' }' ;
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+  {CRIAR FATURA DE CRÉDITOS AVULSOS}
+  function faturaCredito(cod_usuario:string;dados:parametros.credito):TJSONObject;
+  var
+   query          : TFDQuery;
+   conexao        : TFDConnection;
+   codigo         : string;
+   json           : string;
+   codigoHttp     : integer;
+   mensagem       : string;
+   tituloMensagem : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+     codigo           := funcoes.trigger;
+
+        try
+         conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+         query.SQL.Add
+         ('INSERT INTO vendas_credito (idvenda,'+
+                                 'codigocobranca,'+
+                                 'urlFatura,'+
+                                 'valor,'+
+                                 'quantidadeNotas,'+
+                                 'vencimento_venda,'+
+                                 'data_venda,'+
+                                 'hora_venda,'+
+                                 'status_venda,'+
+                                 'cod_usuario)values(');
+         query.SQL.Add(''''  +codigo+'''');
+         query.SQL.Add(',''' +dados.codigoCobranca + '''');
+         query.SQL.Add(',''' +dados.urlFatura+ '''');
+         query.SQL.Add(',''' +funcoes.TrocaVirgPPto(CurrToStr(dados.valor))+'''');
+         query.SQL.Add(',''' +somenteNumeros(IntToStr(dados.quantidadeNotas))+'''');
+         query.SQL.Add(',''' +funcoes.formataData(DateToStr(dados.vencimentoCobranca))+'''');
+         query.SQL.Add(',''' +funcoes.formataData(DateToStr(now))+ '''');
+         query.SQL.Add(',''' +TimeToStr(now) + '''');
+         query.SQL.Add(',''' +dados.status+ '''');
+         query.SQL.Add(',''' +cod_usuario+ ''')');
+         query.ExecSQL;
+
+         if query.RowsAffected = 1 then
+            begin
+             tituloMensagem := 'fatura gerada';
+             mensagem       := codigo;
+             codigoHttp     := 201;
+            end;
+
+           except
+            on E: Exception do
+             begin
+               tituloMensagem := 'Erro interno';
+               mensagem       := funcoes.RemoveAcento(e.Message);
+               codigoHttp     := 500;
+               funcoes.logErro(e.Message);
+             end;
+        end;
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": [], '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+    Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+    freeandnil(query);
+    FreeAndNil(conexao);
+  end;
+
+  {HISTORICO DE CREDITOS}
+  function historicoCreditos(cod_usuario:string;pagina,registros:Integer):TJSONObject;
+   var
+   query          : TFDQuery;
+   LJSONArray     : TJSONArray;
+   conexao        : TFDConnection;
+   dados          : string;
+   json           : string;
+   codigoHttp     : integer;
+   mensagem       : string;
+   tituloMensagem : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+          try
+             conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+             query.Close;
+             query.SQL.Add(' SELECT '+
+                           ' idvenda'+
+                           ',codigocobranca'+
+                           ',urlfatura'+
+                           ',valor'+
+                           ',vencimento_venda'+
+                           ',data_venda'+
+                           ',status_venda'+
+                           ',quantidadeNotas'+
+                           ' FROM vendas_credito where  vencimento_venda >=  CURRENT_DATE  and  data_venda  BETWEEN CURRENT_DATE -7  AND CURRENT_DATE  and cod_usuario='''+cod_usuario+'''  ORDER BY data_venda desc  LIMIT '+IntToStr(registros)+' OFFSET '+IntToStr((pagina-1) * registros)+'  ');
+
+
+             funcoes.faz_log_texto('',query.SQL.Text);
+             query.Open;
+
+               if  query.RowsAffected = 0  then
+                  begin
+                     codigoHttp      := 404;
+                     tituloMensagem  := 'nenhuma informação';
+                     mensagem        := 'nenhuma venda encontrada';
+                  end else
+                       begin
+                          codigoHttp := 200;
+                          LJSONArray            := query.ToJSONArray;
+                          dados := '"faturas":'+ LJSONArray.Format;
+                          LJSONArray.Free;
+                       end;
+
+             except
+              on E: Exception do
+               begin
+                tituloMensagem := 'Erro interno';
+                mensagem       := funcoes.RemoveAcento(e.Message);
+                codigoHttp     := 500;
+                funcoes.logErro(e.Message);
+               end;
+          end;
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": { '+ dados +'}, '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+  {SALDO DOS CRÉDITOS}
+  function saldoCreditos(cod_usuario:string):TJSONObject;
+var
+   query              : TFDQuery;
+   LJSONArray         : TJSONObject;
+   conexao            : TFDConnection;
+   jsonRetorno        : string;
+   dados              : string;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+        try
+         conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+         query.Close;
+         query.SQL.Add
+         ('SELECT   licencaatual,'+
+                   'quantidadecredito,'+
+                   'vencimentolicenca,'+
+                   'saldocredito,'+
+                   'nfeusados,'+
+                   'vencimentocredito,'+
+                   'quantidadecreditocontratado,'+
+                   'notasgratis'+
+                   ' FROM usuarios where codigousuario = '''+cod_usuario+'''');
+         query.Open;
+
+         if query.RowsAffected = 1  then
+              begin
+                  jsonRetorno  :=
+                                    ' "licenca": { '+
+                                    '   "licencaAtual": "'+query.FieldByName('licencaatual').AsString+'", '+
+                                    '   "vencimento": "'+query.FieldByName('vencimentolicenca').AsString+'"'+
+                                    '  }, '+
+                                    '  "creditos": { '+
+                                    '    "saldoValor": "'+formatfloat('###,##0.00',query.FieldByName('saldocredito').AsFloat)+'",'+
+                                    '    "quantidade": "'+query.FieldByName('quantidadecredito').AsString+'",'+
+                                    '    "creditoUsado":  "'+query.FieldByName('nfeusados').AsString+'",'+
+                                    '    "vencimento": "'+query.FieldByName('vencimentocredito').AsString+'",'+
+                                    '    "quantidadeContratada": "'+query.FieldByName('quantidadecreditocontratado').AsString+'",'+
+                                    '    "notasGratis": "'+query.FieldByName('notasgratis').AsString+'"'+
+                                    '  }'+
+                                    ' ';
+
+                     codigoHttp     := 200;
+                     dados          := jsonRetorno;
+
+                     json := '{ '+
+                     '  "mensagemRetorno": {  '+
+                     '   "titulo": "'+ tituloMensagem  +'", '+
+                     '   "mensagem": "'+ mensagem +'" '+
+                     ' }, '+
+                     ' "dadosRetorno": { '+ dados +'}, '+
+                     ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                     ' }' ;
+
+                    Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                    freeandnil(query);
+                    FreeAndNil(conexao);
+              end;
+
+           except
+            on E: Exception do
+             begin
+              codigoHttp     := 500;
+              tituloMensagem := 'Erro interno';
+              mensagem       := funcoes.RemoveAcento(e.Message);
+              funcoes.logErro(e.Message);
+             end;
+        end;
+
+       json          := '{ '+
+       '  "mensagemRetorno": {  '+
+       '   "titulo": "'+ tituloMensagem  +'", '+
+       '   "mensagem": "'+ mensagem +'" '+
+       ' }, '+
+       ' "dadosRetorno": { '+ dados +'}, '+
+       ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+       ' }' ;
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+
+  {LIMITE DE COBRANÇAS DIÁRIAS}
+  function limiteCobranca(cod_usuario:string):TJSONObject;
+var
+   query              : TFDQuery;
+   LJSONArray         : TJSONObject;
+   conexao            : TFDConnection;
+   jsonRetorno        : string;
+   dados              : string;
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+   resultado          : TStringList;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+        try
+           conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+           resultado := TStringList.Create;
+
+           query.Close;
+           query.SQL.Add
+           ('SELECT 7- COUNT(*) AS TOTAL FROM vendas_credito  WHERE data_venda = CURDATE() AND cod_usuario = '''+cod_usuario+''' UNION ALL '+
+            'SELECT 7- COUNT(*) AS TOTAL FROM vendas_usuarios WHERE data_venda = CURDATE() AND cod_usuario = '''+cod_usuario+'''   ;');
+
+            query.Open;
+                       query.First;
+                         while not(query.Eof) do
+                          begin
+                           resultado.Add(query.FieldByName('TOTAL').AsString);
+                           query.Next;
+                          end;
+
+                  jsonRetorno  :=
+                                    '  "cobrancas": { '+
+                                    '    "creditos":"'+resultado.Strings[0]+'",'+
+                                    '    "planoFixo":"'+resultado.Strings[1]+'"'+
+                                    '  }'+
+                                    ' ';
+
+                     codigoHttp     := 200;
+                     dados          := jsonRetorno;
+
+                     json := '{ '+
+                     '  "mensagemRetorno": {  '+
+                     '   "titulo": "'+ tituloMensagem  +'", '+
+                     '   "mensagem": "'+ mensagem +'" '+
+                     ' }, '+
+                     ' "dadosRetorno": { '+ dados +'}, '+
+                     ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                     ' }' ;
+
+                    Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                    freeandnil(query);
+                    FreeAndNil(conexao);
+
+           except
+            on E: Exception do
+             begin
+              codigoHttp     := 500;
+              tituloMensagem := 'Erro interno';
+              mensagem       := funcoes.RemoveAcento(e.Message);
+              funcoes.logErro(e.Message);
+             end;
+        end;
+
+       json          := '{ '+
+       '  "mensagemRetorno": {  '+
+       '   "titulo": "'+ tituloMensagem  +'", '+
+       '   "mensagem": "'+ mensagem +'" '+
+       ' }, '+
+       ' "dadosRetorno": { '+ dados +'}, '+
+       ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+       ' }' ;
+
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+
+
+
+
+end.
+

@@ -1,0 +1,540 @@
+unit funcoes;
+
+interface
+
+uses
+  System.SysUtils,
+  System.Classes,
+  vcl.forms,
+  Bcl.Jose.Core.JWT,
+  Bcl.Jose.Core.Builder,
+  Sparkle.HttpServer.Response,
+  FireDAC.Comp.Client,
+  XData.Server.Module,
+  Dialogs,
+  blcksock,
+  Json,
+  DataSet.Serialize,
+  FireDAC.Stan.Def,
+  FireDAC.VCLUI.Wait,
+  FireDAC.DApt;
+
+  function  RemoveAcento(const pText: string): string;
+  function  RemoveChar(STR: string;CHR: char): string;
+  function  geraToken:string;
+  function  formataData(dado:string):string;
+  function  trigger:string;
+  procedure statusHTTP(status:integer);
+  function  JsonNegado:string;
+  procedure logErro(DescricaoErro:string);
+  procedure logChamada;
+  procedure faz_log_texto(secao, erro: string);
+  function  retorna_COD_UF(UF:string):string;
+  function  TrocaVirgPPto(Valor: string): String;
+  function  zerosCNPJ_CPF(dados:Int64;tipo:Int64):string;
+  function  lerTXT(caminho:string):string;
+  function  somenteNumeros(const S: string): string;
+  function  logaToken(token:String):TJSONObject;
+  function  verificaTokenADM(tokenInserido:string):TJSONObject;
+
+
+  var
+   ResultadoJson       : WideString;
+   MetodoChamado       : string;
+   UrlChamada          : string;
+
+
+   dbPorta     : string = '5432';
+   dbHost      : string = 'localhost';
+   dbDriver    : string = 'PG';
+   dbNome      : string = 'kinotas';
+   dbUser      : string = 'postgres';
+   dbSenha     : string = '2236';
+
+
+
+implementation
+
+
+
+  {REMOVER ACENTO}
+  function RemoveAcento(const pText: string): string;
+  type
+     USAscii20127 = type AnsiString(20127);
+   begin
+    Result := string(USAscii20127(pText));
+    Result := RemoveChar(Result,#39);
+    Result := RemoveChar(Result, '"');
+   end;
+
+  {REMOVER ACENTO 2}
+  function RemoveChar(STR: string;CHR: char): string;
+     var
+	    cont : integer;
+       begin
+	      Result := '';
+	      for cont := 1 to Length(STR) do begin
+		      if (STR[cont] <> CHR) then
+			    Result := Result + STR[cont];
+	      end;
+       end;
+
+
+
+  {GERAR TOKEN API}
+  function  geraToken:string;
+  var
+   JWT: TJWT;
+  begin
+    JWT := TJWT.Create(TJWTClaims);
+    try
+     JWT.Claims.SetClaimOfType<string>('role',FormatDateTime('ddmmyyyyhhnnsszz',now));
+     JWT.Claims.Issuer := 'XData Server';
+     Result            := TJOSE.SHA256CompactToken('secret', JWT);
+    finally
+     FreeAndNil(JWT);
+    end;
+  end;
+
+  {DATA FORMATADA}
+  function FormataData(dado:string):string;
+   begin
+      Result := FormatDateTime('YYYY-MM-DD',strtodate(dado));
+   end;
+
+  {GERA CÓDIGO ALEATORIO}
+  function  trigger:string;
+    begin
+      result := FormatDateTime('ddmmyyyyhhnnsszz',now) + IntToStr(Random(999));
+    end;
+
+  {STATUS HTTP}
+  procedure statusHTTP(status:integer);
+    begin
+     Sparkle.HttpServer.Response.code_alternativo:= IntToStr(status);
+    end;
+
+  {MEU TOKEN PESSOAL}
+  function verificaTokenADM(tokenInserido:string):TJSONObject;
+   var
+   json               : string;
+   codigoHttp         : integer;
+   mensagem           : string;
+   tituloMensagem     : string;
+   begin
+    if tokenInserido = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiMzEwNTIwMjAxNTI0NTgyMzQiLCJpc3MiOiJYRGF0YSBTZXJ2ZXIifQ.6ZgZDssm-YplLNA5lFUzh-xe6oP2Y3RJOuApQsLfjzw'
+       then
+          begin
+           tituloMensagem  := 'tudo certo';
+           mensagem        := 'logado com sucesso';
+           codigoHttp      := 200;
+
+            json          := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem +'" '+
+             ' }, '+
+             ' "dadosRetorno": [], '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+          end else
+               begin
+                 tituloMensagem  := 'Oops';
+                 mensagem        := 'token administrativo inválido';
+                 codigoHttp      := 401;
+
+                  json          := '{ '+
+                   '  "mensagemRetorno": {  '+
+                   '   "titulo": "'+ tituloMensagem  +'", '+
+                   '   "mensagem": "'+ mensagem +'" '+
+                   ' }, '+
+                   ' "dadosRetorno": [], '+
+                   ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+                   ' }' ;
+               end;
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+   end;
+
+
+  {NOVO LOGA TOKEN}
+  function  logaToken(token:string):TJSONObject;
+   var
+   query              : TFDQuery;
+   conexao            : TFDConnection;
+   json               : string;
+   dados              : string;
+   LJSONArray         : TJSONArray;
+
+
+   tituloMensagem    : string;
+   mensagem          : string;
+   codigoHttp        : integer;
+
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+       if token = ''  then
+          begin
+            json          := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "Oops", '+
+             '   "mensagem": "Token inválido" '+
+             ' }, '+
+             ' "dadosRetorno": [], '+
+             ' "codigoHttp": "401" '+
+             ' }' ;
+
+            Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+            freeandnil(query);
+            FreeAndNil(conexao);
+            Exit;
+          end;
+
+        try
+         conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+         query.Close;
+         query.SQL.Add('SELECT '+
+                      ' codigoUsuario, '+
+                      ' bloqueado, '+
+                      ' cnpjempresa, '+
+                      ' razaoempresa, '+
+                      ' fantasiaempresa, '+
+                      ' ieempresa, '+
+                      ' cnaeempresa, '+
+                      ' telefoneempresa, '+
+                      ' enderecoempresa, '+
+                      ' complementoempresa, '+
+                      ' numeroempresa, '+
+                      ' cepempresa, '+
+                      ' bairroempresa, '+
+                      ' cidadeempresa, '+
+                      ' ufempresa, '+
+                      ' regimeempresa, '+
+                      ' coduf, '+
+                      ' ibgemunicipio, '+
+                      ' vencimentolicenca, '+
+                      ' validadecertificado, '+
+                      ' seriecertificado, '+
+                      ' certificadosenha, '+
+                      ' nfeserie, '+
+                      ' nfenumero, '+
+                      ' nfeambiente, '+
+                      ' nfceserie, '+
+                      ' nfcenumero, '+
+                      ' nfcecsc, '+
+                      ' nfceidcsc, '+
+                      ' nfceambiente, '+
+                      ' nfeambiente, '+
+                      ' nfeambiente, '+
+                      ' nfeambiente, '+
+                      ' nfeambiente, '+
+                      ' nfeambiente '+
+                      ' from usuarios where tokenUsuario = '''+token+'''');
+         query.Open;
+
+           if query.RowsAffected = 1  then
+              begin
+               if query.FieldByName('bloqueado').AsString <> 'N'  then
+                  begin
+
+                   tituloMensagem := 'oops';
+                   codigoHttp := 401;
+
+
+                    json          := '{ '+
+                     '  "mensagemRetorno": {  '+
+                     '   "titulo": "Oops", '+
+                     '   "mensagem": "Usuário inativo" '+
+                     ' }, '+
+                     ' "dadosRetorno": [], '+
+                     ' "codigoHttp": "401" '+
+                     ' }' ;
+                    Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+                    freeandnil(query);
+                    FreeAndNil(conexao);
+                    Exit;
+                  end;
+
+               MetodoChamado     :=  TXDataOperationContext.Current.Request.Method;
+               UrlChamada        :=  TXDataOperationContext.Current.Request.RawUri;
+
+
+
+               LJSONArray        := query.ToJSONArray;
+               dados             := '"usuario":'+ LJSONArray.Format;
+               LJSONArray.Free;
+
+               tituloMensagem := 'tudo certo';
+               codigoHttp := 200;
+
+
+               json        := '{ '+
+                     '  "mensagemRetorno": {  '+
+                     '   "titulo": "Oops", '+
+                     '   "mensagem": "tudo certinho" '+
+                     ' }, '+
+                     ' "dadosRetorno": '+dados+', '+
+                     ' "codigoHttp": "200" '+
+                     ' }' ;
+               logChamada;
+              end
+           else
+              begin
+               tituloMensagem    := 'Opps';
+               mensagem          := 'Token inválido';
+               codigoHttp        := 401;
+              end;
+
+           except
+            on E: Exception do
+             begin
+              tituloMensagem     :=  'Erro interno TOKEN';
+              mensagem           :=  funcoes.RemoveAcento(e.Message);
+              codigoHttp         :=  500;
+              faz_log_texto('Erro ao Verificar token do usuario', e.Message);
+             end;
+        end;
+
+
+             json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+tituloMensagem +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": { '+ dados +'}, '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+            Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+            freeandnil(query);
+            FreeAndNil(conexao);
+  end;
+
+
+  {JSON NEGADO}
+  function  JsonNegado:string;
+   begin
+    Result := '{"value":false}';
+   end;
+
+
+  {LOG DE ERRO}
+  procedure logErro(DescricaoErro:string);
+   var
+   query: TFDQuery;
+  begin
+    funcoes.ResultadoJson := funcoes.JsonNegado;
+  //  dm_dados.conLogError.Connected := True;
+    query             := TFDQuery.Create(nil);
+  //  query.Connection  := dm_dados.conLogError;
+        try
+         query.SQL.Add
+         ('INSERT INTO ERROS     (ID_ERRO,'+
+                                 'CODIGO_USUARIO,'+
+                                 'DESCRICAO_ERRO,'+
+                                 'URL,'+
+                                 'METODO,'+
+                                 'DATA_ERRO,'+
+                                 'HORA_ERRO)values(');
+         query.SQL.Add(''''  +trigger+ '''');
+         //query.SQL.Add(',''' +CodUsuarioLogado+ '''');
+         query.SQL.Add(',''' +RemoveAcento(DescricaoErro) + '''');
+         query.SQL.Add(',''' +UrlChamada+ '''');
+         query.SQL.Add(',''' +MetodoChamado+ '''');
+         query.SQL.Add(',''' +FormataData(DateToStr(now))+ '''');
+         query.SQL.Add(',''' +TimeToStr(now)+ ''')');
+         query.ExecSQL;
+           except
+            on E: Exception do
+             begin
+               faz_log_texto('Erro ao gravar log de erro ', e.Message);
+             end;
+        end;
+     freeandnil(query);
+    // dm_dados.conLogError.Connected := false;
+  end;
+
+
+  {LOG DE CHAMADAS DA API}
+  procedure logChamada;
+   var
+   query: TFDQuery;
+  begin
+   // dm_dados.conCalll.Connected := True;
+    query             := TFDQuery.Create(nil);
+   // query.Connection  := dm_dados.conCalll;
+        try
+         query.SQL.Add
+         ('INSERT INTO CHAMADAS  (ID_CHAMADA,'+
+                                 'CODIGO_USUARIO,'+
+                                 'METODO,'+
+                                 'URL,'+
+                                 'DATA_CHAMADA,'+
+                                 'HORA_CHAMADA)values(');
+         query.SQL.Add(''''  +trigger+ '''');
+         //query.SQL.Add(',''' +CodUsuarioLogado+ '''');
+         query.SQL.Add(',''' +MetodoChamado+ '''');
+         query.SQL.Add(',''' +UrlChamada+ '''');
+         query.SQL.Add(',''' +FormataData(DateToStr(now))+ '''');
+         query.SQL.Add(',''' +TimeToStr(now)+ ''')');
+        // query.ExecSQL;
+           except
+            on E: Exception do
+             begin
+
+
+               faz_log_texto('Erro ao gravar log de chamada..', e.Message);
+             end;
+        end;
+     freeandnil(query);
+   //  dm_dados.conCalll.Connected := false;
+  end;
+
+  {LOG DE TEXTO}
+  procedure faz_log_texto(secao, erro: string);
+var
+  NomeDoLog: string;
+  Arquivo: TextFile;
+   begin
+    NomeDoLog := ChangeFileExt(ExtractFilePath(ExtractFilePath(Application.ExeName))+'Logs', '.log');
+    AssignFile(Arquivo, NomeDoLog);
+     if FileExists(NomeDoLog) then
+        Append(Arquivo) { se existir, apenas adiciona linhas }
+     else
+       ReWrite(Arquivo); { cria um novo se não existir }
+        try
+         WriteLn(Arquivo, DateTimeToStr(Now) + ':' + secao + '..: ' + #13 + erro);
+         WriteLn(Arquivo,
+           '----------------------------------------------------------------------');
+         finally
+          CloseFile(Arquivo);
+        end;
+   End;
+
+  {GERA CODIGO UF}
+  function  retorna_COD_UF(UF:string):string;
+  begin
+     if UF = 'RO' then Result := '11';
+     if UF = 'AC' then Result := '12';
+     if UF = 'AM' then Result := '13';
+     if UF = 'RR' then Result := '14';
+     if UF = 'PA' then Result := '15';
+     if UF = 'AP' then Result := '16';
+     if UF = 'TO' then Result := '17';
+     if UF = 'MA' then Result := '21';
+     if UF = 'PI' then Result := '22';
+     if UF = 'CE' then Result := '23';
+     if UF = 'RN' then Result := '24';
+     if UF = 'PB' then Result := '25';
+     if UF = 'PE' then Result := '26';
+     if UF = 'AL' then Result := '27';
+     if UF = 'SE' then Result := '28';
+     if UF = 'BA' then Result := '29';
+     if UF = 'MG' then Result := '31';
+     if UF = 'ES' then Result := '32';
+     if UF = 'RJ' then Result := '33';
+     if UF = 'SP' then Result := '35';
+     if UF = 'PR' then Result := '41';
+     if UF = 'SC' then Result := '42';
+     if UF = 'RS' then Result := '43';
+     if UF = 'MS' then Result := '50';
+     if UF = 'GO' then Result := '52';
+     if UF = 'DF' then Result := '53';
+  end;
+
+   {TROCAR VIGULA POR PONTO}
+ function TrocaVirgPPto(Valor: string): String;
+   var i:integer;
+  begin
+    try
+      if Valor <>'' then begin
+        for i := 0 to Length(Valor) do begin
+            if Valor[i]=',' then Valor[i]:='.';
+        end;
+      end;
+     Result := valor;
+     except
+     on E: Exception do
+       begin
+       end;
+    end;
+  end;
+
+  {ADCIONA ZEROS CNPJ}
+  function  zerosCNPJ_CPF(dados:Int64;tipo:Int64):string;
+  begin
+     if tipo = 1 then
+       begin
+         Result :=  FormatFloat('00000000000000',dados);
+       end else
+             begin
+               Result :=  FormatFloat('00000000000',dados);
+             end;
+
+     {1 CNPJ  2 CPF }
+  end;
+
+
+  {LER AQUIVOS TXT}
+  function  lerTXT(caminho:string):string;
+   var
+     arquivo  : TextFile;
+     texto    : string;
+   BEGIN
+      AssignFile(arquivo,caminho);
+      Reset(arquivo);
+
+      while not eof(arquivo) do
+        begin
+          Readln(arquivo, texto);
+          result := texto;
+        end;
+        Close(arquivo);
+   END;
+
+
+
+    {DEIXA APENAS NUMEROS DE UMA STRING}
+    function somenteNumeros(const S: string): string;
+      var
+        vText : PChar;
+      begin
+        vText := PChar(S);
+        Result := '';
+
+        while (vText^ <> #0) do
+        begin
+          {$IFDEF UNICODE}
+          if CharInSet(vText^, ['0'..'9']) then
+          {$ELSE}
+          if vText^ in ['0'..'9'] then
+          {$ENDIF}
+            Result := Result + vText^;
+
+          Inc(vText);
+        end;
+      end;
+
+
+
+  {LISTA DE RETORNOS HTTP
+   200 - logado, alterado ou removido com sucesso,encontrado com sucesso
+   201 - criado com sucesso
+   404 - não há registros
+   409 - já existe o cadastro
+   401 - token negado
+   500 - erro no banco de dados
+   205 - envie outra informação
+   400 - conteudo inválido
+  {LISTA DE RETORNOS HTTP }
+
+
+
+  { LISTA DE COMISSOES}
+  // PLANO MENSAL DIAMANTE 35,90  COMISSAO : 7,18(20%)
+  // PLANO ANUAL  ESTRELA  429,90 COMISSAO : 107,47(25%)
+
+
+end.

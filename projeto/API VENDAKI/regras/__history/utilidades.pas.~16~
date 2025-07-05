@@ -1,0 +1,451 @@
+unit utilidades;
+
+interface
+
+uses
+ System.SysUtils,
+ System.Classes,
+ vcl.forms,
+ Vcl.Dialogs,
+ FireDAC.Comp.Client,
+ parametros,
+ DataSet.Serialize,
+ System.JSON,
+ EncdDecd;
+
+ function buscar_bancos(descricao:string;pagina,registros:integer):TJSONObject;
+ function buscar_ncm(descricao,codigo:string;pagina,registros:integer):TJSONObject;
+ function buscar_cfop(descricao,codigo:string;pagina,registros:integer):TJSONObject;
+ function buscar_cest(descricao,codigo:string;pagina,registros:integer):TJSONObject;
+ function buscar_anp(descricao,codigo:string;pagina,registros:integer):TJSONObject;
+ function buscar_paises(descricao,codigo:string;pagina,registros:integer):TJSONObject;
+ function buscar_municipios(descricao,codigo:string;pagina,registros:integer):TJSONObject;
+
+
+
+implementation
+
+
+uses funcoes;
+
+
+
+ function buscar_bancos(descricao:string;pagina,registros:integer):TJSONObject;
+  var
+   query          : TFDQuery;
+   LJSONArray     : TJSONArray;
+   conexao        : TFDConnection;
+   dados          : string;
+   json           : string;
+   codigoHttp     : integer;
+   mensagem       : string;
+   tituloMensagem : string;
+  begin
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+          try
+             conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+             query.Close;
+             query.SQL.Add(' SELECT '+
+                           ' cod'+
+                           ',banco'+
+                           ' FROM bancos where  banco like ''%'+descricao+'%''  ORDER BY banco ASC  LIMIT '+IntToStr(registros)+' OFFSET('+IntToStr(pagina)+' - 1) * '+IntToStr(registros)+' ');
+             query.Open;
+
+               if  query.RowsAffected = 0  then
+                  begin
+                     codigoHttp      := 404;
+                     tituloMensagem  := 'nenhum encontrado';
+                     mensagem        := 'Nenhum banco encontrada';
+                  end else
+                       begin
+                          codigoHttp := 200;
+                          LJSONArray            := query.ToJSONArray;
+                          dados := '"bancos":'+ LJSONArray.Format;
+                          LJSONArray.Free;
+                       end;
+
+             except
+              on E: Exception do
+               begin
+                tituloMensagem := 'Erro interno';
+                mensagem       := funcoes.RemoveAcento(e.Message);
+                codigoHttp     := 500;
+                funcoes.logErro(e.Message);
+               end;
+          end;
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": { '+ dados +'}, '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+
+ function buscar_ncm(descricao,codigo:string;pagina,registros:integer):TJSONObject;
+  var
+   query          : TFDQuery;
+   LJSONArray     : TJSONArray;
+   conexao        : TFDConnection;
+   dados          : string;
+   json           : string;
+   codigoHttp     : integer;
+   mensagem       : string;
+   tituloMensagem : string;
+   sql            : string;
+  begin
+
+     if  (descricao <> '%')  and  (descricao <> '')  then
+         begin
+            sql  := 'descricao like ''%'+descricao+'%''';
+         end  else
+              begin
+                sql  := 'ncm  like ''%'+codigo+'%''';
+              end;
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+          try
+             conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+             query.Close;
+             query.SQL.Add(' SELECT '+
+                           ' ncm'+
+                           ',descricao'+
+                           ' FROM ncm where '+sql+' ORDER BY descricao ASC  LIMIT '+IntToStr(registros)+' OFFSET('+IntToStr(pagina)+' - 1) * '+IntToStr(registros)+' ');
+             query.Open;
+
+               if  query.RowsAffected = 0  then
+                  begin
+                     codigoHttp      := 404;
+                     tituloMensagem  := 'nenhum encontrado';
+                     mensagem        := 'Nenhum NCM encontrado';
+                  end else
+                       begin
+                          codigoHttp := 200;
+                          LJSONArray            := query.ToJSONArray;
+                          dados := '"ncm":'+ LJSONArray.Format;
+                          LJSONArray.Free;
+                       end;
+
+             except
+              on E: Exception do
+               begin
+                tituloMensagem := 'Erro interno';
+                mensagem       := funcoes.RemoveAcento(e.Message);
+                codigoHttp     := 500;
+                funcoes.logErro(e.Message);
+               end;
+          end;
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": { '+ dados +'}, '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+
+ function buscar_cfop(descricao,codigo:string;pagina,registros:integer):TJSONObject;
+var
+   query          : TFDQuery;
+   LJSONArray     : TJSONArray;
+   conexao        : TFDConnection;
+   dados          : string;
+   json           : string;
+   codigoHttp     : integer;
+   mensagem       : string;
+   tituloMensagem : string;
+   sql            : string;
+  begin
+
+     if (descricao <> '') and  (descricao <> '%') then
+         begin
+            sql  := 'descricao like ''%'+descricao+'%''';
+         end  else
+              begin
+                sql  := 'cfop  like ''%'+codigo+'%''';
+              end;
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+          try
+             conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+             query.Close;
+             query.SQL.Add(' SELECT '+
+                           ' cfop'+
+                           ',descricao'+
+                           ' FROM cfop where '+sql+' ORDER BY descricao ASC  LIMIT '+IntToStr(registros)+' OFFSET('+IntToStr(pagina)+' - 1) * '+IntToStr(registros)+' ');
+             query.Open;
+
+               if  query.RowsAffected = 0  then
+                  begin
+                     codigoHttp      := 404;
+                     tituloMensagem  := 'nenhum encontrado';
+                     mensagem        := 'Nenhum CFOP encontrado';
+                  end else
+                       begin
+                          codigoHttp := 200;
+                          LJSONArray          := query.ToJSONArray;
+                          dados := '"cfop":'+ LJSONArray.Format;
+                          LJSONArray.Free;
+                       end;
+
+             except
+              on E: Exception do
+               begin
+                tituloMensagem := 'Erro interno';
+                mensagem       := funcoes.RemoveAcento(e.Message);
+                codigoHttp     := 500;
+                funcoes.logErro(e.Message);
+               end;
+          end;
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": { '+ dados +'}, '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+
+ function buscar_cest(descricao,codigo:string;pagina,registros:integer):TJSONObject;
+var
+   query          : TFDQuery;
+   LJSONArray     : TJSONArray;
+   conexao        : TFDConnection;
+   dados          : string;
+   json           : string;
+   codigoHttp     : integer;
+   mensagem       : string;
+   tituloMensagem : string;
+   sql            : string;
+  begin
+
+     if (descricao <> '') and  (descricao <> '%') then
+         begin
+            sql  := 'descricao like ''%'+descricao+'%''';
+         end  else
+              begin
+                sql  := 'cest  like ''%'+codigo+'%''';
+              end;
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+          try
+             conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+             query.Close;
+             query.SQL.Add(' SELECT '+
+                           ' cest'+
+                           ',descricao'+
+                           ' FROM tab_cest where '+sql+' ORDER BY descricao ASC  LIMIT '+IntToStr(registros)+' OFFSET('+IntToStr(pagina)+' - 1) * '+IntToStr(registros)+' ');
+             query.Open;
+
+               if  query.RowsAffected = 0  then
+                  begin
+                     codigoHttp      := 404;
+                     tituloMensagem  := 'nenhum encontrado';
+                     mensagem        := 'Nenhum CEST encontrado';
+                  end else
+                       begin
+                          codigoHttp := 200;
+                          LJSONArray          := query.ToJSONArray;
+                          dados := '"cest":'+ LJSONArray.Format;
+                          LJSONArray.Free;
+                       end;
+
+             except
+              on E: Exception do
+               begin
+                tituloMensagem := 'Erro interno';
+                mensagem       := funcoes.RemoveAcento(e.Message);
+                codigoHttp     := 500;
+                funcoes.logErro(e.Message);
+               end;
+          end;
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": { '+ dados +'}, '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+ end;
+
+
+ function buscar_anp(descricao,codigo:string;pagina,registros:integer):TJSONObject;
+var
+   query          : TFDQuery;
+   LJSONArray     : TJSONArray;
+   conexao        : TFDConnection;
+   dados          : string;
+   json           : string;
+   codigoHttp     : integer;
+   mensagem       : string;
+   tituloMensagem : string;
+   sql            : string;
+  begin
+
+     if (descricao <> '') and  (descricao <> '%') then
+         begin
+            sql  := 'descricao like ''%'+descricao+'%''';
+         end  else
+              begin
+                sql  := 'codigo  like ''%'+codigo+'%''';
+              end;
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+          try
+             conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+             query.Close;
+             query.SQL.Add(' SELECT '+
+                           ' codigo'+
+                           ',descricao'+
+                           ' FROM anp where '+sql+' ORDER BY descricao ASC  LIMIT '+IntToStr(registros)+' OFFSET('+IntToStr(pagina)+' - 1) * '+IntToStr(registros)+' ');
+             query.Open;
+
+               if  query.RowsAffected = 0  then
+                  begin
+                     codigoHttp      := 404;
+                     tituloMensagem  := 'nenhum encontrado';
+                     mensagem        := 'Nenhum ANP encontrado';
+                  end else
+                       begin
+                          codigoHttp := 200;
+                          LJSONArray          := query.ToJSONArray;
+                          dados := '"anp":'+ LJSONArray.Format;
+                          LJSONArray.Free;
+                       end;
+
+             except
+              on E: Exception do
+               begin
+                tituloMensagem := 'Erro interno';
+                mensagem       := funcoes.RemoveAcento(e.Message);
+                codigoHttp     := 500;
+                funcoes.logErro(e.Message);
+               end;
+          end;
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": { '+ dados +'}, '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+
+ function buscar_paises(descricao,codigo:string;pagina,registros:integer):TJSONObject;
+ var
+   query          : TFDQuery;
+   LJSONArray     : TJSONArray;
+   conexao        : TFDConnection;
+   dados          : string;
+   json           : string;
+   codigoHttp     : integer;
+   mensagem       : string;
+   tituloMensagem : string;
+   sql            : string;
+  begin
+
+     if (descricao <> '') and  (descricao <> '%') then
+         begin
+            sql  := 'pais like ''%'+descricao+'%''';
+         end  else
+              begin
+                sql  := 'codigo  like ''%'+codigo+'%''';
+              end;
+     conexao          := TFDConnection.Create(nil);
+     query            := TFDQuery.Create(nil);
+     query.Connection := conexao;
+
+          try
+             conexao.Open('DriverID='+funcoes.dbDriver+';Database='+funcoes.dbNome+';User_Name='+funcoes.dbUser+';Password='+funcoes.dbSenha+';Port='+funcoes.dbPorta+';Server='+funcoes.dbHost);
+             query.Close;
+             query.SQL.Add(' SELECT '+
+                           ' codigo'+
+                           ',pais'+
+                           ' FROM paises where '+sql+' ORDER BY pais ASC  LIMIT '+IntToStr(registros)+' OFFSET('+IntToStr(pagina)+' - 1) * '+IntToStr(registros)+' ');
+             query.Open;
+
+               if  query.RowsAffected = 0  then
+                  begin
+                     codigoHttp      := 404;
+                     tituloMensagem  := 'nenhum encontrado';
+                     mensagem        := 'Nenhum País encontrado';
+                  end else
+                       begin
+                          codigoHttp := 200;
+                          LJSONArray          := query.ToJSONArray;
+                          dados := '"pais":'+ LJSONArray.Format;
+                          LJSONArray.Free;
+                       end;
+
+             except
+              on E: Exception do
+               begin
+                tituloMensagem := 'Erro interno';
+                mensagem       := funcoes.RemoveAcento(e.Message);
+                codigoHttp     := 500;
+                funcoes.logErro(e.Message);
+               end;
+          end;
+     json := '{ '+
+             '  "mensagemRetorno": {  '+
+             '   "titulo": "'+ tituloMensagem  +'", '+
+             '   "mensagem": "'+ mensagem  +'" '+
+             ' }, '+
+             ' "dadosRetorno": { '+ dados +'}, '+
+             ' "codigoHttp": "'+ IntToStr(codigoHttp) +'" '+
+             ' }' ;
+
+      Result := TJSonObject.ParseJSONValue(json) as TJSonObject;
+      freeandnil(query);
+      FreeAndNil(conexao);
+  end;
+
+
+
+
+
+
+
+
+
+end.

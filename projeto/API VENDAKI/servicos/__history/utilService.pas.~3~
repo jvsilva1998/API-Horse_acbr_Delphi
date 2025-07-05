@@ -1,0 +1,42 @@
+unit utilService;
+
+interface
+
+uses
+  XData.Server.Module,
+  XData.Service.Common,
+  parametros,
+  Json,
+  funcoes,
+  natureza,
+  System.SysUtils;
+
+type
+  [ServiceContract]
+  Iutil= interface(IInvokable)
+    ['{04FB9CCB-F5E2-477C-9AD3-639CCB8D5592}']
+    [httpget]function  bancos(pagina,registros:Integer;descricao:string):TJSONObject;
+  end;
+
+  [ServiceImplementation]
+  TIutil = class(TInterfacedObject, Iutil)
+  private
+    function  bancos(pagina,registros:Integer;descricao:string):TJSONObject;
+  end;
+
+implementation
+
+
+
+function TIutil.bancos(pagina,registros:Integer;descricao:string): TJSONObject;
+ begin
+
+
+ end;
+
+initialization
+  RegisterServiceType(TypeInfo(Iutil));
+  RegisterServiceType(TIutil);
+
+end.
+

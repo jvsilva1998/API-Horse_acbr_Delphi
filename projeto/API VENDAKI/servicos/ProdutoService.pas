@@ -1,0 +1,129 @@
+unit ProdutoService;
+
+interface
+
+uses
+  XData.Server.Module,
+  XData.Service.Common,
+  parametros,
+  funcoes,
+  produto,
+  System.JSON,
+
+  System.SysUtils;
+
+type
+  [ServiceContract]
+  Iprodutos= interface(IInvokable)
+    ['{04FB9CCB-F5E2-477C-9AD3-639CCB8D5592}']
+    [httppost]   function  cadastrar(dados:parametros.produto):TJSonObject;
+    [httpdelete] function  remover([FromPath] codigo:string):TJSONObject;
+    [httpput]    function  alterar([FromPath]  codigo:string;dados:parametros.produto):TJSONObject;
+    [httpget]    function  buscar(descricao,codigo,ean:string;pagina,registros:integer):TJSONObject;
+  end;
+
+  [ServiceImplementation]
+  TIprodutos = class(TInterfacedObject, Iprodutos)
+  private
+   function  cadastrar(dados:parametros.produto):TJSonObject;
+   function  remover(codigo:string):TJSONObject;
+   function  alterar(codigo:string;dados:parametros.produto):TJSONObject;
+   function  buscar(descricao,codigo,ean:string;pagina,registros:integer):TJSONObject;
+  end;
+
+implementation
+
+
+
+
+
+{ALTERAR}
+function TIprodutos.alterar(codigo: string;dados: parametros.produto): TJSONObject;
+  var
+   resultado      : TJSONObject;
+   usuario        : TJSONObject;
+ begin
+     usuario           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuario.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado  :=  produto.alterar_produto(codigo,dados,usuario.P['mensagemRetorno'].FindValue('mensagem').Value);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(usuario.P['mensagemRetorno'].ToString) as TJSonObject;
+             funcoes.statusHTTP(strtoint(usuario.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+
+ {BUSCAR}
+ function TIprodutos.buscar(descricao,codigo,ean:string;pagina,registros:integer): TJSONObject;
+ var
+   usuario    : TJSONObject;
+   resultado  : TJSONObject;
+ begin
+     usuario           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuario.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado := produto.buscar_produto(descricao,codigo,ean,registros,pagina,usuario.P['mensagemRetorno'].FindValue('mensagem').Value);
+            if resultado.FindValue('codigoHttp').Value = '200' then
+               begin
+                result      := TJSonObject.ParseJSONValue(resultado.P['dadosRetorno'].ToString) as TJSonObject;
+               end else
+                   begin
+                    result  :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+                   end;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').Value));
+      end else
+           begin
+            result := TJSonObject.ParseJSONValue(usuario.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(usuario.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+
+ {CADASTRO}
+function TIprodutos.cadastrar(dados: parametros.produto): TJSonObject;
+  var
+   resultado      : TJSONObject;
+   usuario        : TJSONObject;
+ begin
+     usuario           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuario.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado  :=  produto.cadastra_produto(dados,usuario.P['mensagemRetorno'].FindValue('mensagem').Value);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(usuario.P['mensagemRetorno'].ToString) as TJSonObject;
+             funcoes.statusHTTP(strtoint(usuario.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+
+ {REMOVER}
+function TIprodutos.remover(codigo: string): TJSONObject;
+  var
+   resultado      : TJSONObject;
+   usuario        : TJSONObject;
+ begin
+     usuario           := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if usuario.FindValue('codigoHttp').value = '200' then
+      begin
+            resultado  :=  produto.remove_produto(codigo,usuario.P['mensagemRetorno'].FindValue('mensagem').Value);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(usuario.P['mensagemRetorno'].ToString) as TJSonObject;
+             funcoes.statusHTTP(strtoint(usuario.FindValue('codigoHttp').Value));
+           end;
+ end;
+
+initialization
+  RegisterServiceType(TypeInfo(Iprodutos));
+  RegisterServiceType(TIprodutos);
+
+end.

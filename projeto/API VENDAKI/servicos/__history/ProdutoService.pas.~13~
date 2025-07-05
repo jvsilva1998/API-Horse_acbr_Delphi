@@ -1,0 +1,103 @@
+unit ProdutoService;
+
+interface
+
+uses
+  XData.Server.Module,
+  XData.Service.Common,
+  parametros,
+  funcoes,
+  produto,
+  System.JSON,
+  retornos;
+
+type
+  [ServiceContract]
+  Iprodutos= interface(IInvokable)
+    ['{04FB9CCB-F5E2-477C-9AD3-639CCB8D5592}']
+    [httppost]   function  cadastrar(dados:parametros.produto):TJSonObject;
+    [httpdelete] function  remover([FromPath] codigo:string):TJSONObject;
+    [httpput]    function  alterar([FromPath]  codigo:string;dados:parametros.produto):TJSONObject;
+    [httpget]    function  buscar([FromPath] descricao, [FromPath] codigoInterno:string; [FromPath] codigoBarras:string):TJSONObject;
+  end;
+
+  [ServiceImplementation]
+  TIprodutos = class(TInterfacedObject, Iprodutos)
+  private
+   function  cadastrar(dados:parametros.produto):TJSonObject;
+   function  remover(codigo:string):TJSONObject;
+   function  alterar(codigo:string;dados:parametros.produto):TJSONObject;
+   function  buscar(descricao,codigoInterno,codigoBarras:string):TJSONObject;
+  end;
+
+implementation
+
+
+
+
+
+{ALTERAR}
+function TIprodutos.alterar(codigo: string;dados: parametros.produto): TJSONObject;
+    var
+  resultado :integer;
+ begin
+    if funcoes.verificaTokenlogado(TXDataOperationContext.Current.Request.Headers.Get('Authorization')) = true then
+      begin
+            resultado :=  produto.alterar_produto(codigo,dados);
+            result    := TJSonObject.ParseJSONValue(retornos.retorno) as TJSonObject;
+            funcoes.statusHTTP(resultado);
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(retornos.retorno) as TJSonObject;
+           end;
+ end;
+
+
+ {BUSCAR}
+ function TIprodutos.buscar(descricao, codigoInterno,codigoBarras: string): TJSONObject;
+ begin
+
+ end;
+
+
+ {CADASTRO}
+function TIprodutos.cadastrar(dados: parametros.produto): TJSonObject;
+  var
+  resultado :integer;
+ begin
+    if funcoes.verificaTokenlogado(TXDataOperationContext.Current.Request.Headers.Get('Authorization')) = true then
+      begin
+            resultado :=  produto.cadastra_produto(dados);
+            result    := TJSonObject.ParseJSONValue(retornos.retorno) as TJSonObject;
+            funcoes.statusHTTP(resultado);
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(retornos.retorno) as TJSonObject;
+           end;
+ end;
+
+
+
+
+ {REMOVER}
+function TIprodutos.remover(codigo: string): TJSONObject;
+ var
+  resultado :integer;
+ begin
+      if funcoes.verificaTokenlogado(TXDataOperationContext.Current.Request.Headers.Get('Authorization')) = true then
+      begin
+            resultado :=  produto.remove_produto(codigo);
+            result := TJSonObject.ParseJSONValue(retornos.retorno) as TJSonObject;
+            funcoes.statusHTTP(resultado);
+      end else
+           begin
+             result := TJSonObject.ParseJSONValue(retornos.retorno) as TJSonObject;
+           end;
+
+ end;
+
+initialization
+  RegisterServiceType(TypeInfo(Iprodutos));
+  RegisterServiceType(TIprodutos);
+
+end.

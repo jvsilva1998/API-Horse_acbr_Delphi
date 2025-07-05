@@ -1,0 +1,120 @@
+unit impostoService;
+
+interface
+
+uses
+  XData.Server.Module,
+  XData.Service.Common,
+  parametros,
+  Json,
+  funcoes,
+  imposto,
+  retornos,
+  System.SysUtils;
+
+type
+  [ServiceContract]
+  Iimpostos= interface(IInvokable)
+    ['{04FB9CCB-F5E2-477C-9AD3-639CCB8D5592}']
+    [httppost]   function cadastrar(dados:parametros.PerfilTibutario):TJSONObject;
+    [httpdelete] function remover([FromPath]codigo:string):TJSONObject;
+    [httpput]    function alterar([FromPath] codigo:string;dados:parametros.PerfilTibutario):TJSonObject;
+    [httpget]    function buscar(descricao:string;pagina,registros:integer):TJSONObject;
+  end;
+
+  [ServiceImplementation]
+  TIimpostos = class(TInterfacedObject, Iimpostos)
+  private
+    function cadastrar(dados:parametros.PerfilTibutario):TJSONObject;
+    function remover(codigo:string):TJSONObject;
+    function alterar(codigo:string;dados:parametros.PerfilTibutario):TJSonObject;
+    function buscar(descricao:string;pagina,registros:integer):TJSONObject;
+  end;
+
+implementation
+
+ {ALTERAR}
+function TIimpostos.alterar(codigo: string; dados: parametros.PerfilTibutario): TJSonObject;
+  var
+   resultado      : TJSONObject;
+   codigo_usuario : string;
+ begin
+       codigo_usuario := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if codigo_usuario <> '' then
+      begin
+            resultado  :=  imposto.alterar_imposto(codigo,dados,codigo_usuario);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result    := TJSonObject.ParseJSONValue(retornos.retorno) as TJSonObject;
+           end;
+ end;
+
+ {BUSCAR}
+function TIimpostos.buscar(descricao:string;pagina,registros:integer): TJSONObject;
+ var
+   codigo_usuario : string;
+   resultado      : TJSONObject;
+ begin
+       codigo_usuario := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if codigo_usuario <> '' then
+      begin
+            resultado := imposto.buscar_imposto(descricao,pagina,registros,codigo_usuario);
+
+            if resultado.FindValue('codigoHttp').Value = '200' then
+               begin
+                result      := TJSonObject.ParseJSONValue(resultado.P['dadosRetorno'].ToString) as TJSonObject;
+               end else
+                   begin
+                    result  :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+                   end;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').Value));
+      end else
+           begin
+            result    := TJSonObject.ParseJSONValue(retornos.retorno) as TJSonObject;
+           end;
+ end;
+
+ {CADASTRAR}
+function TIimpostos.cadastrar(dados: parametros.PerfilTibutario):TJSONObject;
+  var
+   resultado      : TJSONObject;
+   codigo_usuario : string;
+ begin
+       codigo_usuario := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if codigo_usuario <> '' then
+      begin
+            resultado  :=  imposto.cadastra_imposto(dados,codigo_usuario);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result    := TJSonObject.ParseJSONValue(retornos.retorno) as TJSonObject;
+           end;
+ end;
+
+ {REMOVER}
+function TIimpostos.remover(codigo: string): TJSonObject;
+  var
+   resultado      : TJSONObject;
+   codigo_usuario : string;
+ begin
+       codigo_usuario := funcoes.logaToken(TXDataOperationContext.Current.Request.Headers.Get('Authorization'));
+    if codigo_usuario <> '' then
+      begin
+            resultado  :=  imposto.remover_imposto(codigo,codigo_usuario);
+            result     :=  TJSonObject.ParseJSONValue(resultado.P['mensagemRetorno'].ToString) as TJSonObject;
+            funcoes.statusHTTP(strtoint(resultado.FindValue('codigoHttp').value));
+      end else
+           begin
+             result  := TJSonObject.ParseJSONValue(retornos.retorno) as TJSonObject;
+           end;
+ end;
+
+initialization
+  RegisterServiceType(TypeInfo(Iimpostos));
+  RegisterServiceType(TIimpostos);
+
+end.
+
